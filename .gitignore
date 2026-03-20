@@ -45,6 +45,8 @@ compile_commands.json
 *.includes
 *.idb
 *.exp
+*.dll
+*.ilk
 
 # Other stuff
 *.log
@@ -60,3 +62,8 @@ compile_commands.json
 # Cmake
 cmake-build*
 CMakeUserPresets.json
+
+# Ignore the launcher
+Godot*.exe
+
+#

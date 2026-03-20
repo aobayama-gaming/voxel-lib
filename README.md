@@ -1,56 +1,85 @@
-# godot-cpp template
-This repository serves as a quickstart template for GDExtension development with Godot 4.0+.
+# Opti Voxel
 
-## Contents
-* Preconfigured source files for C++ development of the GDExtension ([src/](./src/))
-* An empty Godot project in [project/](./project), to test the GDExtension
-* godot-cpp as a submodule (`godot-cpp/`)
-* GitHub Issues template ([.github/ISSUE_TEMPLATE.yml](./.github/ISSUE_TEMPLATE.yml))
-* GitHub CI/CD workflows to publish your library packages when creating a release ([.github/workflows/builds.yml](./.github/workflows/builds.yml))
-* An SConstruct file with various functions, such as boilerplate for [Adding documentation](https://docs.godotengine.org/en/stable/tutorials/scripting/cpp/gdextension_docs_system.html)
 
-## Usage - Template
+# Development 
 
-To use this template, log in to GitHub and click the green "Use this template" button at the top of the repository page. This will let you create a copy of this repository with a clean git history.
+The easiest way to develop Opti Voxel is to setup an IDE.
+The main tutorial from the documentation is nice [Configuring an IDE/Visual Studio Code](https://docs.godotengine.org/en/4.3/contributing/development/configuring_an_ide/visual_studio_code.html)
 
-To get started with your new GDExtension, do the following:
 
-* clone your repository to your local computer
-* initialize the godot-cpp git submodule via `git submodule update --init`
-* change the name of the compiled library file inside the [SConstruct](./SConstruct) file by modifying the `libname` string.
-  * change the paths of the to be loaded library name inside the [project/bin/example.gdextension](./project/bin/example.gdextension) file, by replacing `EXTENSION-NAME` with the name you chose for `libname`.
-* change the `entry_symbol` string inside [project/bin/example.gdextension](./project/bin/example.gdextension) file.
-  * rename the `example_library_init` function in [src/register_types.cpp](./src/register_types.cpp) to the same name you chose for `entry_symbol`.
-* change the name of the `project/bin/example.gdextension` file
+## VS code
 
-Now, you can build the project with the following command:
+For the user of VS Code a quick summary below :
 
-```shell
-scons
-```
+Following these instructions you should be able to have a working debugging suite for the extension. It can be noted that the debugger won't work for the process spawned by the editor (if you choose to use the `Launch Project (Editor)` path in the `launch.json` ) so this can only be use to debug the actual editor. If you want to debug the test game you should use the `Launch Project` path.
 
-If the build command worked, you can test it with the [project](./project) project. Import it into Godot, open it, and launch the main scene. You should see it print the following line in the console:
+Create in `.vscode` folder the following file :
+
+`launch.json` :
+
+Don't forget to modify actual project `--path` and `program` path
 
 ```
-Type: 24
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+        "name": "Launch Project",
+        "type": "cppvsdbg",
+        "request": "launch",
+        // Change the path below to the location of your Godot executable.
+        "program": "${workspaceFolder}/../Godot_v4.6.1-stable_win64.exe/Godot_v4.6.1-stable_win64.exe",
+        // Change the arguments below for the project you want to test with.
+        "args": ["--path", "../voxel-lib/project" ],
+        "stopAtEntry": false,
+        "cwd": "${workspaceFolder}",
+        "environment": [],
+        "console": "internalConsole",
+        "visualizerFile": "${workspaceFolder}/platform/windows/godot.natvis",
+        "preLaunchTask": "build"
+        },
+        {
+        "name": "Launch Project (Editor)",
+        "type": "cppvsdbg",
+        "request": "launch",
+        // Change the path below to the location of your Godot executable.
+        "program": "${workspaceFolder}/../Godot_v4.6.1-stable_win64.exe/Godot_v4.6.1-stable_win64.exe",
+        // Change the arguments below for the project you want to test with.
+        "args": ["--editor", "--path", "../voxel-lib/project" ],
+        "stopAtEntry": false,
+        "cwd": "${workspaceFolder}",
+        "environment": [],
+        "console": "internalConsole",
+        "visualizerFile": "${workspaceFolder}/platform/windows/godot.natvis",
+        "preLaunchTask": "build"
+        }
+    ]
+}
 ```
 
-### Configuring an IDE
-You can develop your own extension with any text editor and by invoking scons on the command line, but if you want to work with an IDE (Integrated Development Environment), you can use a compilation database file called `compile_commands.json`. Most IDEs should automatically identify this file, and self-configure appropriately.
-To generate the database file, you can run one of the following commands in the project root directory:
-```shell
-# Generate compile_commands.json while compiling
-scons compiledb=yes
+`tasks.json` :
 
-# Generate compile_commands.json without compiling
-scons compiledb=yes compile_commands.json
+```
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+        "label": "build",
+        "group": "build",
+        "type": "shell",
+        "command": "scons",
+        "args": [
+            // enable for debugging with breakpoints
+            "dev_build=yes",
+        ],
+        "problemMatcher": "$msCompile"
+        }
+    ]
+}
 ```
 
-## Usage - Actions
-
-This repository comes with continuous integration (CI) through a GitHub action that tests building the GDExtension.
-It triggers automatically for each pushed change. You can find and edit it in [builds.yml](.github/workflows/ci.yml).
-
-There is also a workflow ([make_build.yml](.github/workflows/make_build.yml)) that builds the GDExtension for all supported platforms that you can use to create releases.
-You can trigger this workflow manually from the `Actions` tab on GitHub.
-After it is complete, you can find the file `godot-cpp-template.zip` in the `Artifacts` section of the workflow run.
