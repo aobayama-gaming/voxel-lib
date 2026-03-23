@@ -3,12 +3,17 @@
 
 #include "sdf_dummy.h"
 
+#include "chunk_math.hpp"
+
 void VoxelEngineClass::_bind_methods() {
     // Bind properties so they appear in editor
 
     ClassDB::bind_method(D_METHOD("set_lod_distances", "distances"), &VoxelEngineClass::set_lod_distances);
     ClassDB::bind_method(D_METHOD("get_lod_distances"), &VoxelEngineClass::get_lod_distances);
     ADD_PROPERTY(PropertyInfo(Variant::PACKED_FLOAT32_ARRAY, "lod_distances"), "set_lod_distances", "get_lod_distances");
+
+
+    ClassDB::bind_method(D_METHOD("debug_get_parent_chunk", "child_pos"), &VoxelEngineClass::debug_get_parent_chunk);
 
 }
 
@@ -19,6 +24,24 @@ void VoxelEngineClass::set_lod_distances(const PackedFloat32Array &p_distances) 
 
 PackedFloat32Array VoxelEngineClass::get_lod_distances() const {
     return lod_distances;
+}
+
+
+void VoxelEngineClass::set_sdf(SDFBase *p_sdf) {
+    sdf = p_sdf;
+}
+SDFBase *VoxelEngineClass::get_sdf() const {
+    return sdf;
+}
+
+
+Vector3i VoxelEngineClass::debug_get_parent_chunk(const Vector3i &child_pos) const {
+    // Debug function to test the parent chunk calculation.
+    return Vector3i(
+        ChunkMath::get_parent_from_child(child_pos.x), 
+        ChunkMath::get_parent_from_child(child_pos.y), 
+        ChunkMath::get_parent_from_child(child_pos.z)
+    );
 }
 
 
@@ -77,8 +100,8 @@ void VoxelEngineClass::scan_chunks_to_load() {
     while (scan.x <= scan_end.x) {
         while (scan.y <= scan_end.y) {
             while (scan.z <= scan_end.z) {
-                const int is_empty = empty_chunks.get_lod(scan,lod_count-1);
-                const int is_loaded = loaded_chunks.get_lod(scan,lod_count-1);
+                const int is_empty = empty_chunks.get_max_lod(scan,lod_count-1);
+                const int is_loaded = loaded_chunks.get_max_lod(scan,lod_count-1);
                 // print_line(vformat("Scanning chunk: %s", chunk_pos));
                 //scan_x += VoxelEngineConstants::CHUNK_SIZE;
             }
