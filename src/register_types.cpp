@@ -5,7 +5,8 @@
 #include <godot_cpp/core/defs.hpp>
 #include <godot_cpp/godot.hpp>
 
-#include "example_class.h"
+#include "chunk_class.h"
+#include "voxel_engine_class.h"
 
 using namespace godot;
 
@@ -14,7 +15,8 @@ void initialize_gdextension_types(ModuleInitializationLevel p_level)
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
-	GDREGISTER_CLASS(ExampleClass);
+	GDREGISTER_CLASS(ChunkClass);
+	GDREGISTER_CLASS(VoxelEngineClass);
 }
 
 void uninitialize_gdextension_types(ModuleInitializationLevel p_level) {
