@@ -13,6 +13,7 @@ void VoxelEngineClass::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::PACKED_FLOAT32_ARRAY, "lod_distances"), "set_lod_distances", "get_lod_distances");
 
 
+    // Debug method to test parent chunk calculation
     ClassDB::bind_method(D_METHOD("debug_get_parent_chunk", "child_pos"), &VoxelEngineClass::debug_get_parent_chunk);
 
 }
@@ -86,29 +87,112 @@ void VoxelEngineClass::center_on_camera() {
 
 void VoxelEngineClass::scan_chunks_to_load() {
 
-    const int load_radius = lod_distances[lod_distances.size() - 1]; // The last LOD distance is the maximum distance at which to load chunks.
-
     const int lod_count = lod_distances.size()-1; 
-    // last index is the max distance, so the number of LODs is size - 1.
 
-    Vector3i scan = Vector3i(-load_radius, -load_radius, -load_radius) - center_chunk;
+    const int max_lod = lod_count-1; // The maximum LOD level to consider for loading. This is determined by the size of the lod_distances array, which should be set up so that each LOD level corresponds to a distance threshold.
 
-    Vector3i scan_end= Vector3i(load_radius, load_radius, load_radius) - center_chunk;
+    const int max_lod_radius = 1 << (max_lod); // The radius of the largest LOD. This is the maximum distance at which chunks will be loaded, so it determines the size of the area to scan.
 
-    int scan_lod = lod_count-1; // Start scanning from the lowest LOD, which is the one with the largest distance.
+    const int max_lod_number = ceil( lod_distances[lod_count-1] /max_lod_radius)+2; 
 
-    while (scan.x <= scan_end.x) {
-        while (scan.y <= scan_end.y) {
-            while (scan.z <= scan_end.z) {
-                const int is_empty = empty_chunks.get_max_lod(scan,lod_count-1);
-                const int is_loaded = loaded_chunks.get_max_lod(scan,lod_count-1);
-                // print_line(vformat("Scanning chunk: %s", chunk_pos));
-                //scan_x += VoxelEngineConstants::CHUNK_SIZE;
+    const Vector3i ancestor_chunk = ChunkMath::get_parent_from_child_until(center_chunk, max_lod);
+
+    const Vector3i search_space = Vector3i(max_lod_number, max_lod_number, max_lod_number) * max_lod_radius;
+
+    const Vector3i start_scan = ancestor_chunk - search_space;
+
+    const Vector3i end_scan = ancestor_chunk + search_space;
+
+    for (int x = start_scan.x; x <= end_scan.x; x += max_lod_radius) {
+        for (int y = start_scan.y; y <= end_scan.y; y += max_lod_radius) {
+            for (int z = start_scan.z; z <= end_scan.z; z += max_lod_radius) {
+                Vector3i scan(x, y, z);
+                _recursive_chunk_scan(center_chunk, scan, lod_distances, scanned_chunks);
             }
-            scan.x = -load_radius;
-            //scan.y += VoxelEngineConstants::CHUNK_SIZE;
         }
-        scan.y = -load_radius;
-        //scan.z += VoxelEngineConstants::CHUNK_SIZE;
+    }
+}
+
+void VoxelEngineClass::prepare_chunks_to_load() {
+    // Prepare the chunks that need to be loaded. perform erase of loaded useless chunk and fill the queue of chunk to laod.
+
+    for (const Vector3i &chunk_pos : scanned_chunks) {
+        if (!loaded_chunks.has(chunk_pos) && !empty_chunks.has(chunk_pos)) {
+            
+            const int lod = ChunkMath::get_lod(chunk_pos);
+            
+            if (abs(sdf->evaluate(ChunkMath::chunk_to_world(chunk_pos))) > ChunkMath::world_chunk_spherical_radius(chunk_pos)) {
+                empty_chunks.insert(chunk_pos);
+            }
+            else {
+                chunks_to_load_by_lod[lod].insert(chunk_pos);
+            }
+
+        }
+    }
+
+    // Erase loaded chunks that are not in the scanned chunks anymore.
+    for (const Vector3i &chunk_pos : loaded_chunks) {
+        if (!scanned_chunks.has(chunk_pos)) {
+            loaded_chunks.erase(chunk_pos);
+        }
+    }
+}
+
+ void _recursive_chunk_scan(const Vector3i &player_chunk,const Vector3i &parent_chunk, PackedFloat32Array &lod_distances, LODHashSet &scanned_chunks)
+ {
+    const int current_lod = ChunkMath::get_lod(parent_chunk);
+
+    if (current_lod ==0){
+        scanned_chunks.insert(parent_chunk);
+        return;
+    }
+
+    const double distance_to_player = player_chunk.distance_to(parent_chunk);
+
+    if (distance_to_player - (1<<current_lod)*0.71f < lod_distances[current_lod-1]) {
+
+        const int child_lod = current_lod - 1;
+        const int child_size = 1 << child_lod;
+
+        for (int i = 0; i < 8; ++i) {
+            Vector3i child_offset(
+                (i & 1) ? child_size : -child_size,
+                (i & 2) ? child_size : -child_size,
+                (i & 4) ? child_size : -child_size
+            );
+
+            _recursive_chunk_scan(
+                player_chunk, 
+                parent_chunk + child_offset, 
+                lod_distances, 
+                scanned_chunks
+            );
+        }
+    }
+    else {
+        scanned_chunks.insert(parent_chunk);
+    }
+
+ }
+
+
+void VoxelEngineClass::load_chunks() {
+    // Load the chunks in the queue. This is separated from the scan function to avoid doing heavy operations in the scan function, which is called every frame.
+
+    for (int lod = 0; lod < chunks_to_load_by_lod.size(); ++lod) {
+        for (const Vector3i &chunk_pos : chunks_to_load_by_lod[lod]) {
+            if (!loaded_chunks.has(chunk_pos) && !empty_chunks.has(chunk_pos)) {
+                
+                // Dummy load function
+                ChunkClass *chunk = memnew(ChunkClass);
+                chunk->initialize_debug(chunk_pos);
+                add_child(chunk);
+
+                chunks.insert(chunk_pos, chunk);
+                loaded_chunks.insert(chunk_pos);
+            }
+        }
+        chunks_to_load_by_lod[lod].clear();
     }
 }

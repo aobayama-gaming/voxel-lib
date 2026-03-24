@@ -21,8 +21,14 @@
 
 #include "chunk_math.hpp"
 
+#include <vector>
 
 using namespace godot;
+
+namespace {
+    // scan the area around the camera determine which chunk to load and their LOD.
+    void _recursive_chunk_scan(const Vector3i &player_chunk,const Vector3i &parent_chunk, PackedFloat32Array &lod_distances, LODHashSet &scanned_chunks);
+}
 
 class LODHashSet : public HashSet<Vector3i> {
 // HashSet of chunk position. The position is stored as the chunk center (LOD 0 : 2 wide),
@@ -36,11 +42,8 @@ public:
         int actual_lod = 0;
 
         while (actual_lod < max_lod) {
-            int32_t parent_x = ChunkMath::get_parent_from_child(p_chunk_pos.x, actual_lod);
-            int32_t parent_y = ChunkMath::get_parent_from_child(p_chunk_pos.y);
-            int32_t parent_z = ChunkMath::get_parent_from_child(p_chunk_pos.z);
 
-            Vector3i parent_pos(parent_x, parent_y, parent_z);
+            Vector3i parent_pos = ChunkMath::get_parent_from_child(p_chunk_pos, actual_lod);
 
             if (has(parent_pos)) {
                 return actual_lod;
@@ -61,7 +64,10 @@ protected:
 private:
     Camera3D *camera;
     HashMap<Vector3i, ChunkClass*> chunks; // chunks loaded (maybe duplicate of the loaded_chunks set)
-    LODHashSet dirty_chunks; // Chunks that need to be updated/treated. (not used)
+
+    LODHashSet scanned_chunks; // Chunks that have been scanned for loading. Used to avoid scanning the same chunk multiple times in a row when the camera is still.
+    
+    //LODHashSet dirty_chunks; // Chunks that need to be updated/treated. (not used)
     LODHashSet loaded_chunks; // Chunks that are currently loaded in the scene.
     LODHashSet empty_chunks; // Chunks that are empty. Caching these avoid over generation.
 
@@ -71,7 +77,7 @@ private:
 
     SDFBase *sdf =nullptr; // The SDF used to generate the chunks. Can be modified later to support multiple SDFs or a more complex SDF system.
 
-    //void _recursive_chunk_scan(const Vector3i &player_pos, con)
+    std::vector<LODHashSet> chunks_to_load_by_lod;
 
 public:
 
@@ -89,9 +95,12 @@ public:
 
     Vector3i debug_get_parent_chunk(const Vector3i &child_pos) const; // Debug function to test the parent chunk calculation.
 
-    void scan_chunks_to_load(); 
-    // scan the area around the camera determine which chunk to load and their LOD.
     
-    void center_on_camera(); 
-    // Center the camera on the current chunk. Used when the camera is moved manually to avoid having the engine load/unload chunks unnecessarily.
+    void scan_chunks_to_load(); //Scan the area arount the camera and determine which chunks to load and their LOD.
+    
+    void prepare_chunks_to_load();//Prepare the chunks that need to be loaded. perform erase of loaded useless chunk and fill the queue of chunk to laod.
+    
+    void load_chunks(); // Load the chunks in the queue. This is separated from the scan function to avoid doing heavy operations in the scan function, which is called every frame.
+
+    void center_on_camera(); // Center the camera on the current chunk. Used when the camera is moved manually to avoid having the engine load/unload chunks unnecessarily.
 };
