@@ -25,10 +25,7 @@
 
 using namespace godot;
 
-namespace {
-    // scan the area around the camera determine which chunk to load and their LOD.
-    void _recursive_chunk_scan(const Vector3i &player_chunk,const Vector3i &parent_chunk, PackedFloat32Array &lod_distances, LODHashSet &scanned_chunks);
-}
+
 
 class LODHashSet : public HashSet<Vector3i> {
 // HashSet of chunk position. The position is stored as the chunk center (LOD 0 : 2 wide),
@@ -55,6 +52,11 @@ public:
     };
 };
 
+namespace {
+    // Scan the area around a chunk recursively to choose the proper LOD leaves/parents.
+    void _recursive_chunk_scan(const Vector3i &player_chunk, const Vector3i &parent_chunk, PackedFloat32Array &lod_distances, LODHashSet &scanned_chunks);
+};
+
 class VoxelEngineClass : public Node3D {
 	GDCLASS(VoxelEngineClass, Node3D)
 
@@ -73,7 +75,7 @@ private:
 
     Vector3i center_chunk; // The chunk the camera is currently in. Used to determine which chunks to load/unload. 
 
-    PackedFloat32Array lod_distances = {32.0f, 64.0f, 128.0f,256.0f}; // The distances at which to switch LOD. The index of the distance in the array is the LOD level.
+    PackedFloat32Array lod_distances; // The distances at which to switch LOD. The index of the distance in the array is the LOD level.
 
     SDFBase *sdf =nullptr; // The SDF used to generate the chunks. Can be modified later to support multiple SDFs or a more complex SDF system.
 
@@ -101,6 +103,8 @@ public:
     void prepare_chunks_to_load();//Prepare the chunks that need to be loaded. perform erase of loaded useless chunk and fill the queue of chunk to laod.
     
     void load_chunks(); // Load the chunks in the queue. This is separated from the scan function to avoid doing heavy operations in the scan function, which is called every frame.
+
+    void run_chunk_pipeline(); // Execute full update pipeline: scan, prepare and load.
 
     void center_on_camera(); // Center the camera on the current chunk. Used when the camera is moved manually to avoid having the engine load/unload chunks unnecessarily.
 };

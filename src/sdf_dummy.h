@@ -9,7 +9,7 @@ public:
     
     // Always return 1.0 (solid everywhere)
     float evaluate(const Vector3 &p_world_pos) const override {
-        return 1.0f;
+        return p_world_pos.y + 0.5f;
     }
     
     // GLSL implementation

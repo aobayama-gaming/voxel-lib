@@ -65,7 +65,7 @@ Vector3i ChunkMath::get_parent_from_child_until(Vector3i coord, int target_lod) 
     Vector3i parent = coord;
     int current_lod = get_lod(parent);
 
-    while (current_lod > target_lod) {
+    while (current_lod < target_lod) {
         parent = get_parent_from_child(parent);
         current_lod++;
     }
@@ -77,16 +77,16 @@ Vector3 ChunkMath::chunk_to_world(Vector3i chunk_coord) {
     // Convert chunk coordinates to world coordinates. This is done by multiplying the chunk coordinates by the chunk size and voxel size.
 
     return Vector3(
-        (chunk_coord.x>>1) * VoxelEngineConstants::CHUNK_SIZE * VoxelEngineConstants::VOXEL_SIZE,
-        (chunk_coord.y>>1) * VoxelEngineConstants::CHUNK_SIZE * VoxelEngineConstants::VOXEL_SIZE,
-        (chunk_coord.z>>1) * VoxelEngineConstants::CHUNK_SIZE * VoxelEngineConstants::VOXEL_SIZE
+        (chunk_coord.x) * VoxelEngineConstants::CHUNK_DIMENSION/2,
+        (chunk_coord.y) * VoxelEngineConstants::CHUNK_DIMENSION/2,
+        (chunk_coord.z) * VoxelEngineConstants::CHUNK_DIMENSION/2
     );
 }
 
 float ChunkMath::world_chunk_size(Vector3i chunk_coord) {
     // Get the world size of the chunk at the given coordinate. The world size is determined by the chunk size multiplied by the LOD.
     int lod = ChunkMath::get_lod(chunk_coord);
-    return (1 << lod) * VoxelEngineConstants::CHUNK_SIZE * VoxelEngineConstants::VOXEL_SIZE;
+    return (1 << lod) * VoxelEngineConstants::CHUNK_DIMENSION; 
 }
 
 float ChunkMath::world_chunk_spherical_radius(Vector3i chunk_coord) {
@@ -95,4 +95,19 @@ float ChunkMath::world_chunk_spherical_radius(Vector3i chunk_coord) {
 
     float half_size = world_chunk_size(chunk_coord) * 0.5f;
     return sqrt(half_size * half_size * 3); // sqrt(x^2 + y^2 + z^2) where x=y=z=half_size
+}
+
+Vector3i ChunkMath::world_to_chunk(Vector3 world_coord) {
+    // Convert world coordinates to the nearest LOD0 chunk coordinates.
+
+    const int32_t cell_x = static_cast<int32_t>(Math::floor(world_coord.x / VoxelEngineConstants::CHUNK_DIMENSION));
+    const int32_t cell_y = static_cast<int32_t>(Math::floor(world_coord.y / VoxelEngineConstants::CHUNK_DIMENSION));
+    const int32_t cell_z = static_cast<int32_t>(Math::floor(world_coord.z / VoxelEngineConstants::CHUNK_DIMENSION));
+
+    // LOD0 chunk centers are odd chunk coordinates: ..., -3, -1, 1, 3, ...
+    return Vector3i(
+        cell_x * 2 + 1,
+        cell_y * 2 + 1,
+        cell_z * 2 + 1
+    );
 }

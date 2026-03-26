@@ -4,12 +4,22 @@
 #include "godot_cpp/classes/box_mesh.hpp"
 #include "godot_cpp/classes/mesh_instance3d.hpp"
 #include "godot_cpp/classes/node3d.hpp"
+#include "godot_cpp/classes/standard_material3d.hpp"
 #include "godot_cpp/classes/wrapped.hpp"
 #include "godot_cpp/variant/variant.hpp"
 
 #include "chunk_math.hpp"
 
 using namespace godot;
+
+enum class ChunkState {
+	DIRTY =0, // The chunk needs to be generated or updated.
+	EVALUATED, // The chunk voxel data has been evaluated, but the mesh has not been generated yet.
+	POINT_CLOUD, // The chunk used the voxel data to generate the point cloud.
+	INNER_MESH, // The chunk generated the inner mesh, but not the outer mesh.
+	OUTER_MESH, // The chunk generated the outer mesh through patch.
+	THREAD_LOCKED, // The chunk is being processed in another thread, and should not be accessed until it's unlocked.
+};
 
 class ChunkClass : public Node3D {
 	GDCLASS(ChunkClass, Node3D)
@@ -19,7 +29,11 @@ protected:
     
 private:
     Ref<BoxMesh> debug_box_mesh;
+	Ref<BoxMesh> outline_box_mesh;
+	Ref<StandardMaterial3D> debug_material;
+	Ref<StandardMaterial3D> outline_material;
     MeshInstance3D *mesh_instance = nullptr;
+	MeshInstance3D *outline_mesh_instance = nullptr;
 	Vector3i chunk_pos; // The position of the chunk in chunk coordinates (not world coordinates). This is used to calculate the LOD and the position of the chunk in the world.
 
 

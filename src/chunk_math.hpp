@@ -18,6 +18,7 @@ namespace ChunkMath{
     Vector3i get_parent_from_child_until(Vector3i coord, int target_lod);
 
     Vector3 chunk_to_world(Vector3i chunk_coord);
+    Vector3i world_to_chunk(Vector3 world_coord);
 
     float world_chunk_size(Vector3i chunk_coord);
     float world_chunk_spherical_radius(Vector3i chunk_coord);
