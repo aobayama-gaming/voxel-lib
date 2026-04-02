@@ -156,6 +156,7 @@ void VoxelEngineClass::prepare_chunks_to_load() {
         if (chunk_ptr && *chunk_ptr) {
             (*chunk_ptr)->queue_free();
         }
+        //Should add here the decimate/augment logic for the chunk if a child/parent need to be loaded
 
         chunks.erase(chunk_pos);
         loaded_chunks.erase(chunk_pos);

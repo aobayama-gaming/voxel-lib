@@ -18,7 +18,6 @@ enum class ChunkState {
 	POINT_CLOUD, // The chunk used the voxel data to generate the point cloud.
 	INNER_MESH, // The chunk generated the inner mesh, but not the outer mesh.
 	OUTER_MESH, // The chunk generated the outer mesh through patch.
-	THREAD_LOCKED, // The chunk is being processed in another thread, and should not be accessed until it's unlocked.
 };
 
 class ChunkClass : public Node3D {
@@ -36,6 +35,7 @@ private:
 	MeshInstance3D *outline_mesh_instance = nullptr;
 	Vector3i chunk_pos; // The position of the chunk in chunk coordinates (not world coordinates). This is used to calculate the LOD and the position of the chunk in the world.
 
+	ChunkState state = ChunkState::DIRTY;
 
 	void _build_debug_mesh();
 
