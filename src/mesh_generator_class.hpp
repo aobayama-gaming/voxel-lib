@@ -17,36 +17,36 @@ struct VerticesData {
 
 
 
-    struct SignGrid3D {
+    struct EdgeGrid3D {
         int32_t width = 0;
         int32_t height = 0;
         int32_t depth = 0;
-        std::vector<bool> values;
+        std::vector<uint32_t> values;
 
         void resize(int32_t p_width, int32_t p_height, int32_t p_depth) {
             width = p_width;
             height = p_height;
             depth = p_depth;
-            values.assign(static_cast<size_t>(width) * static_cast<size_t>(height) * static_cast<size_t>(depth), false);
+            values.assign(static_cast<size_t>(width) * static_cast<size_t>(height) * static_cast<size_t>(depth), 0);
         }
 
         int32_t index(int32_t x, int32_t y, int32_t z) const {
             return x + width * (y + height * z);
         }
 
-        std::vector<bool>::reference operator()(int32_t x, int32_t y, int32_t z) {
+        std::vector<uint32_t>::reference operator()(int32_t x, int32_t y, int32_t z) {
             return values[static_cast<size_t>(index(x, y, z))];
         }
 
-        std::vector<bool>::reference operator()(const Vector3i &coord) {
+        std::vector<uint32_t>::reference operator()(const Vector3i &coord) {
             return (*this)(coord.x, coord.y, coord.z);
         }
 
-        bool operator()(int32_t x, int32_t y, int32_t z) const {
+        uint32_t operator()(int32_t x, int32_t y, int32_t z) const {
             return values[static_cast<size_t>(index(x, y, z))];
         }
 
-        bool operator()(const Vector3i &coord) const {
+        uint32_t operator()(const Vector3i &coord) const {
             return (*this)(coord.x, coord.y, coord.z);
         }
 
@@ -146,7 +146,7 @@ struct VerticesData {
         }
     };
 
-    SignGrid3D sign_grid;                 // size = all cell corner (chunk_size +1)^3
+    EdgeGrid3D x_edge_cases;                 // size = all cell corner (chunk_size +1)^3
 
     int32_t width;
     int32_t height;
@@ -171,7 +171,7 @@ struct VerticesData {
         width = p_width;
         height = p_height;
         depth = p_depth;
-        sign_grid.resize(p_width, p_height, p_depth);
+        x_edge_cases.resize(p_width, p_height, p_depth);
         metadata.resize(p_height, p_depth);
     }
 
