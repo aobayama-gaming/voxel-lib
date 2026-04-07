@@ -81,6 +81,16 @@ struct VerticesData {
         } counts;
     };
 
+    struct EdgeCompute {
+        std::vector<Vector3> local_positions;
+        std::vector<Vector3> normals;
+
+        void configure(int32_t p_count) {
+            local_positions.resize(static_cast<size_t>(p_count));
+            normals.resize(static_cast<size_t>(p_count));
+        }
+    };
+
     struct MetadataGrid {
         int32_t height = 0;
         int32_t depth = 0;
@@ -134,7 +144,9 @@ struct VerticesData {
                     row_accumulator.z_edge += source.counts.z_edge;
                     row_accumulator.point += source.counts.point;
 
-                    cumulative_counts[i] = row_accumulator;
+                    cumulative_counts[i] = row_accumulator; // Stored after in order to have the total number directly, (we have last index of each y,z +1)
+
+
                 }
             }
 
@@ -155,14 +167,9 @@ struct VerticesData {
     MetadataGrid metadata;
 
     //result vector
-    std::vector<float> x_edge_position; 
-    std::vector<Vector3> x_edge_normals;
-
-    std::vector<float> y_edge_position; 
-    std::vector<Vector3> y_edge_normals;
-
-    std::vector<float> z_edge_position; 
-    std::vector<Vector3> z_edge_normals;
+    EdgeCompute x_edge;
+    EdgeCompute y_edge;
+    EdgeCompute z_edge;
 
     std::vector<Vector3> points;
     std::vector<int32_t> vertices;
@@ -175,20 +182,6 @@ struct VerticesData {
         metadata.resize(p_height, p_depth);
     }
 
-    void configure_x_edge(int32_t p_count) {
-        x_edge_position.resize(static_cast<size_t>(p_count));
-        x_edge_normals.resize(static_cast<size_t>(p_count));
-    }
-
-    void configure_y_edge(int32_t p_count) {
-        y_edge_position.resize(static_cast<size_t>(p_count));
-        y_edge_normals.resize(static_cast<size_t>(p_count));
-    }
-
-    void configure_z_edge(int32_t p_count) {
-        z_edge_position.resize(static_cast<size_t>(p_count));
-        z_edge_normals.resize(static_cast<size_t>(p_count));
-    }
 
     void configure_points(int32_t p_count) {
         points.resize(static_cast<size_t>(p_count));
@@ -200,6 +193,24 @@ struct VerticesData {
 
     
 };
+
+//Unused
+// struct QefInformation {
+//     bool edge_changed;
+//     Vector3 start_pos;
+//     Vector3 end_pos;
+//     uint32_t& counter;
+//     VerticesData::EdgeCompute& edge;
+//     bool front = true;
+
+//     Vector3 get_position(){
+//         const Vector3 mid_point = (start_pos+end_pos)/2;
+//         const Vector3 direction = end_pos-start_pos; //supose unit displacement
+//         const Vector3 position = front ? edge.local_positions[counter] : edge.local_positions[counter-1];
+
+//         const Vector3 local_pos = mid_point + direction*position;
+//         }
+// }
 
 /*
     Memory optimised way (for fast search)
@@ -230,6 +241,16 @@ some metadata should be added later for streamlining the sewing between LOD
 
 class MeshBufferClass {
 
+private:
+
+    bool _edge_change(uint32_t edge_case);
+    bool _transversal_change(uint32_t origin_edge, uint32_t paired_edge, bool front);
+    uint32_t _transversal_combination(uint32_t origin_edge, uint32_t paired_edge, bool front);
+
+    void _find_edge_intersection(const Vector3i &start_point, const Vector3i &end_point, const uint32_t edge_case, VerticesData::EdgeCompute &edge_data, uint32_t &index );// This is the call to find the mid position and normal.
+
+    void _accumulate_qef(Vector3 normal,Vector3 position,Basis& a_matrix,Vector3& b_vector);
+
 public:
 
     VerticesData vertices_data;
@@ -239,12 +260,12 @@ public:
     void initialize(const Vector3i &p_chunk_id, SDFBase *p_sdf);
 
     void first_pass(const int32_t p_y_edge,const int32_t p_z_edge);
-    void second_pass(const int32_t p_y_edge,const int32_t p_z_edge);
+    void second_pass(const int32_t p_y_cell,const int32_t p_z_cell);
     void third_pass(const int32_t p_y_edge,const int32_t p_z_edge);
-    void fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell);
+    void fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,const float_t alpha);
     void fifth_pass(const int32_t p_y_qcell,const int32_t p_z_qcell);
 
-    void execute();
+    void execute_on_self(); //serialised one chunk execution.
 
 
 };

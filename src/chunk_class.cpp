@@ -85,8 +85,58 @@ void ChunkClass::_build_debug_mesh() {
     outline_mesh_instance->set_material_override(outline_material);
 }
 
-void ChunkClass::_ready() {
-    if (mesh_instance == nullptr) {
-        _build_debug_mesh();
+void ChunkClass::_build_debug_mesh_point() {
+    // Create mesh instance for points if it doesn't exist
+    if (point_mesh_instance == nullptr) {
+        point_mesh_instance = memnew(MeshInstance3D);
+        add_child(point_mesh_instance);
     }
+
+    // Get points from vertices_data
+    const auto& points = mesh_info.vertices_data.points;
+
+    if (points.size() == 0) {
+        return; // No points to display
+    }
+
+    // Create array mesh
+    Ref<ArrayMesh> point_mesh;
+    point_mesh.instantiate();
+
+    // Create vertex array
+    PackedVector3Array vertices;
+    vertices.resize(static_cast<int>(points.size()));
+    for (size_t i = 0; i < points.size(); ++i) {
+        vertices[i] = points[i];
+    }
+
+    // Create arrays
+    Array arrays;
+    arrays.resize(Mesh::ARRAY_MAX);
+    arrays[Mesh::ARRAY_VERTEX] = vertices;
+
+    // Add surface as point cloud
+    point_mesh->add_surface_from_arrays(Mesh::PRIMITIVE_POINTS, arrays);
+
+    // Set mesh
+    point_mesh_instance->set_mesh(point_mesh);
+
+    // Create and set material
+    Ref<StandardMaterial3D> point_material;
+    point_material.instantiate();
+    point_material->set_shading_mode(StandardMaterial3D::SHADING_MODE_UNSHADED);
+    point_material->set_albedo(Color(1.0f, 1.0f, 0.0f, 1.0f)); // Yellow for visibility
+    point_material->set_point_size(5.0f); // Make points visible
+    point_mesh_instance->set_material_override(point_material);
+}
+
+void ChunkClass::_ready() {
+
+    //first debug of the big square
+    //_build_debug_mesh();
+
+    //second debug serialised treatment    
+    mesh_info.execute_on_self();
+    _build_debug_mesh_point();
+
 }
