@@ -56,8 +56,8 @@ void ChunkClass::initialize_debug(const Vector3i &p_chunk_pos, SDFBase *p_sdf) {
 void ChunkClass::_build_debug_mesh() {
     const float chunk_size = ChunkMath::world_chunk_size(chunk_pos);
     const int lod = ChunkMath::get_lod(chunk_pos);
-    const float fill_scale = 0.996f;
-    const float fill_alpha = 0.25f;
+    const float fill_scale = 0.9f;
+    const float fill_alpha = 0.1f;
     const Color base_color = lod_to_color(lod);
     const Color contour_color = Color(base_color.r * 0.22f, base_color.g * 0.22f, base_color.b * 0.22f, 1.0f);
 

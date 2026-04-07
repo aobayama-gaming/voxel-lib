@@ -51,15 +51,27 @@ void MeshBufferClass::first_pass(const int32_t p_y_edge,const int32_t p_z_edge){
 }
 
 void MeshBufferClass::second_pass(const int32_t p_y_cell,const int32_t p_z_cell){
+    // There is some parallel mess since we modify the start trim and end_trim following neighbour one, this only locally degrade the performance but we can imagine a x_start and a x_end that keep only the x.
 
-
-    if( p_y_cell>=vertices_data.height || p_z_cell>=vertices_data.depth ){
+    if( p_y_cell>=vertices_data.height-1 || p_z_cell>=vertices_data.depth-1 ){
         //in case we run an extra row colum, this pass is iterate on CELL.
         return ;
     }
 
     auto &meta = vertices_data.metadata(p_y_cell, p_z_cell);
     // If x-trim is collapsed, we still need to scan x to catch y/z-only crossings.
+
+    const bool y_max = p_y_cell==vertices_data.height-2;
+    const bool z_max = p_z_cell==vertices_data.depth-2;
+
+    if (y_max) {
+        vertices_data.metadata(p_y_cell+1, p_z_cell).start_trim = MIN(vertices_data.metadata(p_y_cell+1, p_z_cell+1).start_trim,MIN(vertices_data.metadata(p_y_cell+1, p_z_cell).start_trim, meta.start_trim));
+        vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim = MAX(vertices_data.metadata(p_y_cell+1, p_z_cell+1).end_trim,MAX(vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim, meta.end_trim));
+    }
+    if (z_max) {
+        vertices_data.metadata(p_y_cell, p_z_cell+1).start_trim = MIN(vertices_data.metadata(p_y_cell+1, p_z_cell+1).start_trim,MIN(vertices_data.metadata(p_y_cell, p_z_cell+1).start_trim, meta.start_trim));
+        vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim = MAX(vertices_data.metadata(p_y_cell+1, p_z_cell+1).end_trim,MAX(vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim, meta.end_trim));
+    }
 
     // in some weird surface this case can happens
     meta.start_trim = MIN(meta.start_trim,MIN(vertices_data.metadata(p_y_cell+1, p_z_cell).start_trim,vertices_data.metadata(p_y_cell, p_z_cell+1).start_trim));
@@ -69,20 +81,8 @@ void MeshBufferClass::second_pass(const int32_t p_y_cell,const int32_t p_z_cell)
     const bool collapsed_trim = ( meta.end_trim == 0);
     meta.end_trim+=collapsed_trim;
 
-    const bool y_max = p_y_cell==vertices_data.height-2;
-    const bool z_max = p_z_cell==vertices_data.depth-2;
-
     uint32_t end_condition = meta.end_trim;
     uint32_t start_condition = meta.start_trim;
-
-    if (y_max) {
-        vertices_data.metadata(p_y_cell+1, p_z_cell).start_trim = MIN(vertices_data.metadata(p_y_cell+1, p_z_cell).start_trim, meta.start_trim);
-        vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim = MAX(vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim, meta.end_trim);
-    }
-    if (z_max) {
-        vertices_data.metadata(p_y_cell, p_z_cell+1).start_trim = MIN(vertices_data.metadata(p_y_cell, p_z_cell+1).start_trim, meta.start_trim);
-        vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim = MAX(vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim, meta.end_trim);
-    }
 
     for( int32_t x=start_condition ; x<end_condition ; x++){
 
@@ -144,9 +144,6 @@ void MeshBufferClass::second_pass(const int32_t p_y_cell,const int32_t p_z_cell)
         meta.counts.y_edge += front_top_changed;
         meta.counts.z_edge += front_left_changed;
 
-        meta.counts.point+= top_left_changed || top_right_changed || bottom_left_changed || bottom_right_changed || front_top_changed || front_bottom_changed || rear_top_changed || rear_bottom_changed || front_left_changed || front_right_changed || rear_left_changed || rear_right_changed;;
-
-
         if(x == end_condition -1){
 
             if(x==vertices_data.width-1){ // In case sdf cross on the futhermost 
@@ -190,6 +187,51 @@ void MeshBufferClass::second_pass(const int32_t p_y_cell,const int32_t p_z_cell)
 
     if( collapsed_trim && meta.end_trim ==1 ){
         meta.end_trim=0;
+    }
+}
+
+void MeshBufferClass::second_half_pass(const int32_t p_y_cell,const int32_t p_z_cell){
+
+    const int32_t x_start = MIN(
+    vertices_data.metadata(p_y_cell, p_z_cell).start_trim,
+    MIN(vertices_data.metadata(p_y_cell + 1, p_z_cell).start_trim,
+        MIN(vertices_data.metadata(p_y_cell, p_z_cell + 1).start_trim,
+            vertices_data.metadata(p_y_cell + 1, p_z_cell + 1).start_trim))
+    );
+
+    const int32_t x_end = MAX(
+        vertices_data.metadata(p_y_cell, p_z_cell).end_trim,
+        MAX(vertices_data.metadata(p_y_cell + 1, p_z_cell).end_trim,
+            MAX(vertices_data.metadata(p_y_cell, p_z_cell + 1).end_trim,
+                vertices_data.metadata(p_y_cell + 1, p_z_cell + 1).end_trim))
+    );
+
+    for( int32_t x=x_start ; x<x_end ; x++){
+
+        const uint32_t top_left_case = vertices_data.x_edge_cases(x,p_y_cell,p_z_cell);
+        const uint32_t top_right_case = vertices_data.x_edge_cases(x,p_y_cell+1,p_z_cell);
+        const uint32_t bottom_left_case = vertices_data.x_edge_cases(x,p_y_cell,p_z_cell+1);
+        const uint32_t bottom_right_case = vertices_data.x_edge_cases(x,p_y_cell+1,p_z_cell+1);
+
+        const bool top_left_changed = _edge_change(top_left_case);//x
+        const bool top_right_changed = _edge_change(top_right_case);//x
+        const bool bottom_left_changed = _edge_change(bottom_left_case);//x
+        const bool bottom_right_changed = _edge_change(bottom_right_case);//x
+
+        const bool front_top_changed = _transversal_change(top_left_case, top_right_case, true); //y
+        const bool front_bottom_changed = _transversal_change(bottom_left_case, bottom_right_case, true); //y
+
+        const bool front_left_changed = _transversal_change(top_left_case, bottom_left_case, true); //z
+        const bool front_right_changed = _transversal_change(top_right_case, bottom_right_case, true); //z
+
+        const bool rear_top_changed = _transversal_change(top_left_case, top_right_case, false); //y
+        const bool rear_bottom_changed = _transversal_change(bottom_left_case, bottom_right_case, false); //y
+
+        const bool rear_left_changed = _transversal_change(top_left_case, bottom_left_case, false); //z
+        const bool rear_right_changed = _transversal_change(top_right_case, bottom_right_case, false); //z
+
+        vertices_data.metadata(p_y_cell, p_z_cell).counts.point+= top_left_changed || top_right_changed || bottom_left_changed || bottom_right_changed || front_top_changed || front_bottom_changed || rear_top_changed || rear_bottom_changed || front_left_changed || front_right_changed || rear_left_changed || rear_right_changed ;
+
     }
 }
 
@@ -376,7 +418,7 @@ Vector3 MeshBufferClass::_surface_net_vertex(const Vector3 &mass_point_sum, int3
 
 void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,const float_t alpha=0.1){
 
-    if( p_y_cell>=vertices_data.height || p_z_cell>=vertices_data.depth ){
+    if( p_y_cell>=vertices_data.height-1 || p_z_cell>=vertices_data.depth-1 ){
         //in case we run an extra row colum, this pass is iterate on CELL.
         return ;
     }
@@ -493,12 +535,6 @@ void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,
             // Vector3 max_bound = min_bound + Vector3(1.0f, 1.0f, 1.0f);
             // final_vertex = final_vertex.clamp(min_bound, max_bound);
 
-            const Vector3 final_vertex_world = ChunkMath::vertices_to_world(chunk_id, final_vertex);
-            const float final_vertex_sdf = sdf->evaluate(final_vertex_world);
-            if (std::abs(final_vertex_sdf) > 1.0f) {
-                __debugbreak();
-            }
-
             vertices_data.points[vertices_counter]= final_vertex;
 
             vertices_counter--;
@@ -535,6 +571,12 @@ void MeshBufferClass::execute_on_self(){
     for (int32_t z = 0; z < vertices_data.depth - 1; ++z) {
         for (int32_t y = 0; y < vertices_data.height - 1; ++y) {
             second_pass(y, z);
+        }
+    }
+
+    for (int32_t z = 0; z < vertices_data.depth - 1; ++z) {
+        for (int32_t y = 0; y < vertices_data.height - 1; ++y) {
+            second_half_pass(y, z);
         }
     }
 

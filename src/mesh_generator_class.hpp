@@ -275,6 +275,7 @@ public:
 
     void first_pass(const int32_t p_y_edge,const int32_t p_z_edge);
     void second_pass(const int32_t p_y_cell,const int32_t p_z_cell);
+    void second_half_pass(const int32_t p_y_cell,const int32_t p_z_cell);
     void third_pass(const int32_t p_y_edge,const int32_t p_z_edge);
     void fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,const float_t alpha);
     void fifth_pass(const int32_t p_y_qcell,const int32_t p_z_qcell);

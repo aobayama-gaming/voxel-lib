@@ -5,6 +5,8 @@
 
 #include "chunk_math.hpp"
 
+#include <cmath>
+
 
 
 void VoxelEngineClass::_bind_methods() {
@@ -57,19 +59,43 @@ void VoxelEngineClass::_ready() {
 
     if (lod_distances.is_empty()) {
         //hard coded base distances for LOD levels. Can be modified later to be more dynamic or to be set in the editor.
-        const float phi = 2.0f;
-        const float alpha = 0.9f;
-        const int lod_levels = 15;
+        // const float phi = 2.0f;
+        // const float alpha = 2.0f;
+        // const int lod_levels = 15;
 
         PackedFloat32Array generated_distances;
-        generated_distances.resize(lod_levels+1);
+        // generated_distances.resize(lod_levels+1);
 
-        float value = alpha;
-        for (int i = 0; i < lod_levels+1; ++i) {
-            generated_distances.set(i, value);
-            value *= phi;
+        // float value = alpha;
+        // for (int i = 0; i < lod_levels+1; ++i) {
+        //     generated_distances.set(i, value);
+        //     value *= phi;
+        // }
+        // Configuration
+        const int lod_levels = 15;
+        
+        // --- SOTA Parameters ---
+        const float target_pixel_error = 0.1f;   // How many pixels of "jitter" is acceptable
+        const float base_mesh_error = 0.01f;      // Real-world detail loss (e.g., 0.01 meters)
+        const float viewport_height = 1080.0f;    // Target resolution
+        const float fov_rad = 75.0f * (3.14f / 180.0f); 
+
+        // 1. Calculate focal length based on FOV
+        // This makes LODs scale correctly when the player zooms in/out
+        float focal_length = viewport_height / (2.0f * std::tan(fov_rad * 0.5f));
+
+        generated_distances.resize(lod_levels + 1);
+
+        for (int i = 0; i < lod_levels + 1; ++i) {
+            // 2. Geometric error progression
+            // Instead of distance doubling, we assume mesh detail halves per level
+            float geometric_error = base_mesh_error * std::pow(1.5f, i);
+
+            // 3. The SOTA Formula: Distance = (Error * FocalLength) / PixelThreshold
+            float dist = (geometric_error * focal_length) / target_pixel_error;
+            
+            generated_distances.set(i, dist);
         }
-
         set_lod_distances(generated_distances);
     } else {
         chunks_to_load_by_lod.resize(lod_distances.size()-1);
@@ -197,7 +223,13 @@ void _recursive_chunk_scan(const Vector3i &player_chunk,const Vector3i &parent_c
 
     const double distance_to_player = player_chunk.distance_to(parent_chunk);
 
-    if (distance_to_player - (2<<current_lod)*1.4f < lod_distances[current_lod-1]) {
+    // Work fully in chunk-coordinate units.
+    // Half-extent of current LOD chunk in chunk-coord units is 2^lod.
+    const float half_extent = static_cast<float>(1 << current_lod);
+    // Bounding sphere radius of the chunk cube in chunk-coord units.
+    const float chunk_outer_radius = std::sqrt(3.0f) * half_extent;
+
+    if (distance_to_player - chunk_outer_radius < lod_distances[current_lod-1]) {
 
         const int child_lod = current_lod - 1;
         const int child_size = 1 << child_lod;
