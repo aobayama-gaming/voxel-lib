@@ -91,7 +91,7 @@ Vector3 ChunkMath::vertices_to_world(Vector3i chunk_coord, Vector3 local_coord) 
     // - CHUNK_SIZE + 1 maps to the opposite chunk corner
     // chunk_to_world() returns the chunk center, so we offset from min corner.
     const float chunk_size = world_chunk_size(chunk_coord);
-    const float vertex_step = chunk_size / static_cast<float>(VoxelEngineConstants::CHUNK_SIZE + 1);
+    const float vertex_step = chunk_size / static_cast<float>(VoxelEngineConstants::CHUNK_SIZE );
     const Vector3 chunk_center = chunk_to_world(chunk_coord);
     const Vector3 chunk_min_corner = chunk_center - Vector3(
         chunk_size * 0.5f,

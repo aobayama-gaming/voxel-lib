@@ -5,4 +5,8 @@
 [node name="Node" type="Node" unique_id=964298627]
 
 [node name="VoxelEngineClass" type="VoxelEngineClass" parent="." unique_id=31545966]
+lod_distances = PackedFloat32Array(0.9, 1.8, 3.6, 7.2, 14.4, 28.8, 57.6, 115.2, 230.4, 460.8, 921.6, 1843.2, 3686.4, 7372.8, 14745.6, 29491.2)
 script = ExtResource("1_2jas5")
+
+[node name="Marker3D" type="Marker3D" parent="." unique_id=2116868861]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.03347063, -1.0661538, 0)

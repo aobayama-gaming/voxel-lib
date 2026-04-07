@@ -7,9 +7,14 @@ public:
     SDFDummy() = default;
     ~SDFDummy() override = default;
     
-    // Always return 1.0 (solid everywhere)
+    // plane
+    // float evaluate(const Vector3 &p_world_pos) const override {
+    //     return p_world_pos.y + 1.0f;
+    // }
+
+    // GRAD OF 1 IS IMPORTANT !!!!
     float evaluate(const Vector3 &p_world_pos) const override {
-        return p_world_pos.y + 0.5f;
+        return sqrt(p_world_pos.y*p_world_pos.y + p_world_pos.x*p_world_pos.x + p_world_pos.z*p_world_pos.z)  - 10.0f;
     }
     
     // GLSL implementation

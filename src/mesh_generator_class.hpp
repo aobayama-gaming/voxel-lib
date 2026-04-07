@@ -182,6 +182,19 @@ struct VerticesData {
         metadata.resize(p_height, p_depth);
     }
 
+    void cache()
+    {
+        metadata.cache();
+
+        auto& max_meta = metadata.cum(height-1,depth-1);
+
+        points.resize(static_cast<size_t>(max_meta.point));
+        x_edge.configure(max_meta.x_edge);
+        y_edge.configure(max_meta.y_edge);
+        z_edge.configure(max_meta.z_edge);
+
+
+    }
 
     void configure_points(int32_t p_count) {
         points.resize(static_cast<size_t>(p_count));
@@ -250,6 +263,7 @@ private:
     void _find_edge_intersection(const Vector3i &start_point, const Vector3i &end_point, const uint32_t edge_case, VerticesData::EdgeCompute &edge_data, uint32_t &index );// This is the call to find the mid position and normal.
 
     void _accumulate_qef(Vector3 normal,Vector3 position,Basis& a_matrix,Vector3& b_vector);
+    Vector3 _surface_net_vertex(const Vector3 &mass_point_sum, int32_t num_vertices) const;
 
 public:
 

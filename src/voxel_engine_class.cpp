@@ -168,8 +168,9 @@ void VoxelEngineClass::prepare_chunks_to_load() {
         if (!loaded_chunks.has(chunk_pos) && !empty_chunks.has(chunk_pos)) {
             
             const int lod = ChunkMath::get_lod(chunk_pos);
-            
-            if (sdf->evaluate(ChunkMath::chunk_to_world(chunk_pos)) > ChunkMath::world_chunk_size(chunk_pos)/2) {
+
+            const float chunk_outer_radius = ChunkMath::world_chunk_size(chunk_pos) * 0.8660254f; // radius that contain the cube
+            if (abs(sdf->evaluate(ChunkMath::chunk_to_world(chunk_pos))) > chunk_outer_radius) {
                 empty_chunks.insert(chunk_pos);
             }
             else {
@@ -239,7 +240,7 @@ void VoxelEngineClass::load_chunks() {
                 
                 // Dummy load function
                 ChunkClass *chunk = memnew(ChunkClass);
-                chunk->initialize_debug(chunk_pos);
+                chunk->initialize_debug(chunk_pos,sdf);
                 add_child(chunk);
 
                 chunks.insert(chunk_pos, chunk);
