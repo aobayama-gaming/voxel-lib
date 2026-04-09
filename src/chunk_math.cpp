@@ -106,6 +106,20 @@ Vector3 ChunkMath::vertices_to_world(Vector3i chunk_coord, Vector3 local_coord) 
     );
 }
 
+Vector3 ChunkMath::world_to_vertices(Vector3i chunk_coord, Vector3 world_coord) {
+    // Convert a world-space position back to the chunk's vertex-local coordinate system.
+    const float chunk_size = world_chunk_size(chunk_coord);
+    const float vertex_step = chunk_size / static_cast<float>(VoxelEngineConstants::CHUNK_SIZE);
+    const Vector3 chunk_center = chunk_to_world(chunk_coord);
+    const Vector3 chunk_min_corner = chunk_center - Vector3(
+        chunk_size * 0.5f,
+        chunk_size * 0.5f,
+        chunk_size * 0.5f
+    );
+
+    return (world_coord - chunk_min_corner) / vertex_step;
+}
+
 float ChunkMath::world_chunk_size(Vector3i chunk_coord) {
     // Get the world size of the chunk at the given coordinate. The world size is determined by the chunk size multiplied by the LOD.
     int lod = ChunkMath::get_lod(chunk_coord);

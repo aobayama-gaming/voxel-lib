@@ -97,6 +97,7 @@ public:
 
     Vector3i debug_get_parent_chunk(const Vector3i &child_pos) const; // Debug function to test the parent chunk calculation.
 
+    void chunk_patching( ChunkClass &chunk);
     
     void scan_chunks_to_load(); //Scan the area arount the camera and determine which chunks to load and their LOD.
     

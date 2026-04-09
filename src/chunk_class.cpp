@@ -1,6 +1,7 @@
 #include "chunk_class.h"
 
 #include "godot_cpp/classes/standard_material3d.hpp"
+#include "godot_cpp/variant/packed_int32_array.hpp"
 
 #include <cmath>
 
@@ -51,6 +52,116 @@ void ChunkClass::initialize_debug(const Vector3i &p_chunk_pos, SDFBase *p_sdf) {
     mesh_info.execute_on_self();
     _build_debug_mesh_point();
     _build_debug_mesh_edge_points();
+}
+
+void ChunkClass::initialize(const Vector3i &p_chunk_pos, SDFBase *p_sdf) {
+    chunk_pos = p_chunk_pos;
+    sdf = p_sdf;
+
+    set_position(ChunkMath::chunk_to_world(chunk_pos));
+
+    mesh_info.initialize(chunk_pos, sdf);
+    mesh_info.execute_on_self();
+    _build_chunk_mesh();
+
+    state = ChunkState::OUTER_MESH;
+}
+
+void ChunkClass::_build_chunk_mesh() {
+    if (mesh_instance == nullptr) {
+        mesh_instance = memnew(MeshInstance3D);
+        add_child(mesh_instance);
+    }
+
+    const auto &points = mesh_info.vertices_data.points;
+    const auto &raw_indices = mesh_info.vertices_data.vertices;
+
+    if (points.empty() || raw_indices.empty()) {
+        mesh_instance->set_mesh(Ref<ArrayMesh>());
+        return;
+    }
+
+    const Vector3 chunk_origin = ChunkMath::chunk_to_world(chunk_pos);
+
+    PackedVector3Array vertices;
+    vertices.resize(static_cast<int>(points.size()));
+    for (size_t i = 0; i < points.size(); ++i) {
+        const Vector3 world_pos = ChunkMath::vertices_to_world(chunk_pos, points[i]);
+        vertices.set(static_cast<int>(i), world_pos - chunk_origin);
+    }
+
+    PackedVector3Array normals;
+    normals.resize(vertices.size());
+    for (int i = 0; i < normals.size(); ++i) {
+        normals.set(i, Vector3());
+    }
+
+    PackedInt32Array indices;
+    constexpr float min_area_sq = 1e-12f;
+
+    for (size_t i = 0; i + 2 < raw_indices.size(); i += 3) {
+        const int a = static_cast<int>(raw_indices[i]);
+        const int b = static_cast<int>(raw_indices[i + 1]);
+        const int c = static_cast<int>(raw_indices[i + 2]);
+
+        if (a < 0 || b < 0 || c < 0 || a >= vertices.size() || b >= vertices.size() || c >= vertices.size()) {
+            continue;
+        }
+        if (a == b || b == c || c == a) {
+            continue;
+        }
+
+        const Vector3 va = vertices[a];
+        const Vector3 vb = vertices[b];
+        const Vector3 vc = vertices[c];
+        const Vector3 face_normal = (vb - va).cross(vc - va);
+
+        if (face_normal.length_squared() <= min_area_sq) {
+            continue;
+        }
+
+        normals.set(a, normals[a] + face_normal);
+        normals.set(b, normals[b] + face_normal);
+        normals.set(c, normals[c] + face_normal);
+
+        indices.push_back(a);
+        indices.push_back(b);
+        indices.push_back(c);
+    }
+
+    if (indices.is_empty()) {
+        mesh_instance->set_mesh(Ref<ArrayMesh>());
+        return;
+    }
+
+    for (int i = 0; i < normals.size(); ++i) {
+        Vector3 n = normals[i];
+        const float len = n.length();
+        if (len > 1e-8f) {
+            n /= len;
+        } else {
+            n = Vector3(0.0f, 1.0f, 0.0f);
+        }
+        normals.set(i, n);
+    }
+
+    Array arrays;
+    arrays.resize(Mesh::ARRAY_MAX);
+    arrays[Mesh::ARRAY_VERTEX] = vertices;
+    arrays[Mesh::ARRAY_NORMAL] = normals;
+    arrays[Mesh::ARRAY_INDEX] = indices;
+
+    Ref<ArrayMesh> chunk_mesh;
+    chunk_mesh.instantiate();
+    chunk_mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);
+    mesh_instance->set_mesh(chunk_mesh);
+
+    Ref<StandardMaterial3D> surface_material;
+    surface_material.instantiate();
+    surface_material->set_shading_mode(StandardMaterial3D::SHADING_MODE_PER_PIXEL);
+    surface_material->set_roughness(1.0f);
+    surface_material->set_metallic(0.0f);
+    mesh_instance->set_material_override(surface_material);
 }
 
 void ChunkClass::_build_debug_mesh() {

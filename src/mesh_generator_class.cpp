@@ -2,7 +2,76 @@
 #include "sdf_dummy.h"
 #include "chunk_math.hpp"
 
+#include <cmath>
+
 inline constexpr int BINARY_SEARCH_STEP = 8;
+
+namespace {
+
+bool solve_linear_system_3x3(const Basis &a, const Vector3 &b, Vector3 &x) {
+    // Augmented matrix [A|b] solved with partial pivoting.
+    double m[3][4] = {
+        { static_cast<double>(a[0][0]), static_cast<double>(a[0][1]), static_cast<double>(a[0][2]), static_cast<double>(b.x) },
+        { static_cast<double>(a[1][0]), static_cast<double>(a[1][1]), static_cast<double>(a[1][2]), static_cast<double>(b.y) },
+        { static_cast<double>(a[2][0]), static_cast<double>(a[2][1]), static_cast<double>(a[2][2]), static_cast<double>(b.z) }
+    };
+
+    constexpr double eps = 1e-10;
+
+    for (int pivot_col = 0; pivot_col < 3; ++pivot_col) {
+        int best_row = pivot_col;
+        double best_abs = std::abs(m[pivot_col][pivot_col]);
+
+        for (int row = pivot_col + 1; row < 3; ++row) {
+            const double current_abs = std::abs(m[row][pivot_col]);
+            if (current_abs > best_abs) {
+                best_abs = current_abs;
+                best_row = row;
+            }
+        }
+
+        if (best_abs < eps) {
+            return false;
+        }
+
+        if (best_row != pivot_col) {
+            for (int col = pivot_col; col < 4; ++col) {
+                const double tmp = m[pivot_col][col];
+                m[pivot_col][col] = m[best_row][col];
+                m[best_row][col] = tmp;
+            }
+        }
+
+        for (int row = pivot_col + 1; row < 3; ++row) {
+            const double factor = m[row][pivot_col] / m[pivot_col][pivot_col];
+            if (std::abs(factor) < eps) {
+                continue;
+            }
+            for (int col = pivot_col; col < 4; ++col) {
+                m[row][col] -= factor * m[pivot_col][col];
+            }
+        }
+    }
+
+    double result[3] = { 0.0, 0.0, 0.0 };
+    for (int row = 2; row >= 0; --row) {
+        double rhs = m[row][3];
+        for (int col = row + 1; col < 3; ++col) {
+            rhs -= m[row][col] * result[col];
+        }
+
+        const double diag = m[row][row];
+        if (std::abs(diag) < eps) {
+            return false;
+        }
+        result[row] = rhs / diag;
+    }
+
+    x = Vector3(static_cast<float>(result[0]), static_cast<float>(result[1]), static_cast<float>(result[2]));
+    return true;
+}
+
+}
 
 void MeshBufferClass::initialize(const Vector3i &p_chunk_id, SDFBase *p_sdf) {
 
@@ -35,11 +104,11 @@ void MeshBufferClass::first_pass(const int32_t p_y_edge,const int32_t p_z_edge){
 
                 if(first_change){
                     first_change=false;
-                    vertices_data.metadata(p_y_edge,p_z_edge).start_trim = x-1;
+                    vertices_data.metadata(p_y_edge,p_z_edge).x_start_trim = x-1;
                 }
                 vertices_data.metadata(p_y_edge,p_z_edge).counts.x_edge++;
 
-                vertices_data.metadata(p_y_edge,p_z_edge).end_trim = x;
+                vertices_data.metadata(p_y_edge,p_z_edge).x_end_trim = x;
             }
 
         }
@@ -64,18 +133,30 @@ void MeshBufferClass::second_pass(const int32_t p_y_cell,const int32_t p_z_cell)
     const bool y_max = p_y_cell==vertices_data.height-2;
     const bool z_max = p_z_cell==vertices_data.depth-2;
 
+    // in some weird surface this case can happens
+    meta.start_trim = MIN(meta.x_start_trim,MIN(vertices_data.metadata(p_y_cell+1, p_z_cell).x_start_trim,vertices_data.metadata(p_y_cell, p_z_cell+1).x_start_trim));
+    meta.end_trim = MAX(meta.x_end_trim,MAX(vertices_data.metadata(p_y_cell+1, p_z_cell).x_end_trim,vertices_data.metadata(p_y_cell, p_z_cell+1).x_end_trim));
+
+
     if (y_max) {
-        vertices_data.metadata(p_y_cell+1, p_z_cell).start_trim = MIN(vertices_data.metadata(p_y_cell+1, p_z_cell+1).start_trim,MIN(vertices_data.metadata(p_y_cell+1, p_z_cell).start_trim, meta.start_trim));
-        vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim = MAX(vertices_data.metadata(p_y_cell+1, p_z_cell+1).end_trim,MAX(vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim, meta.end_trim));
+        vertices_data.metadata(p_y_cell+1, p_z_cell).start_trim = MIN(vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_start_trim,MIN(vertices_data.metadata(p_y_cell+1, p_z_cell).x_start_trim, meta.x_start_trim));
+        vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim = MAX(vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_end_trim,MAX(vertices_data.metadata(p_y_cell+1, p_z_cell).x_end_trim, meta.x_end_trim));
+
+        meta.start_trim = MIN(vertices_data.metadata(p_y_cell+1, p_z_cell).start_trim,meta.start_trim );
+        meta.end_trim = MAX(vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim, meta.end_trim);
     }
     if (z_max) {
-        vertices_data.metadata(p_y_cell, p_z_cell+1).start_trim = MIN(vertices_data.metadata(p_y_cell+1, p_z_cell+1).start_trim,MIN(vertices_data.metadata(p_y_cell, p_z_cell+1).start_trim, meta.start_trim));
-        vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim = MAX(vertices_data.metadata(p_y_cell+1, p_z_cell+1).end_trim,MAX(vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim, meta.end_trim));
+        vertices_data.metadata(p_y_cell, p_z_cell+1).start_trim = MIN(vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_start_trim,MIN(vertices_data.metadata(p_y_cell, p_z_cell+1).x_start_trim, meta.x_start_trim));
+        vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim = MAX(vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_end_trim,MAX(vertices_data.metadata(p_y_cell, p_z_cell+1).x_end_trim, meta.x_end_trim));
+        meta.start_trim = MIN(vertices_data.metadata(p_y_cell, p_z_cell+1).start_trim,meta.start_trim );
+        meta.end_trim = MAX(vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim, meta.end_trim);
     }
 
-    // in some weird surface this case can happens
-    meta.start_trim = MIN(meta.start_trim,MIN(vertices_data.metadata(p_y_cell+1, p_z_cell).start_trim,vertices_data.metadata(p_y_cell, p_z_cell+1).start_trim));
-    meta.end_trim = MAX(meta.end_trim,MAX(vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim,vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim));
+    //edge case for x_start transfer for the border line
+    if(y_max && z_max){
+        vertices_data.metadata(p_y_cell+1, p_z_cell+1).start_trim =vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_start_trim;
+        vertices_data.metadata(p_y_cell+1, p_z_cell+1).end_trim =vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_end_trim;
+    }
 
 
     const bool collapsed_trim = ( meta.end_trim == 0);
@@ -416,7 +497,7 @@ Vector3 MeshBufferClass::_surface_net_vertex(const Vector3 &mass_point_sum, int3
     return mass_point_sum / static_cast<float>(num_vertices);
 }
 
-void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,const float_t alpha=0.1){
+void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,const float_t alpha=0.5f){
 
     if( p_y_cell>=vertices_data.height-1 || p_z_cell>=vertices_data.depth-1 ){
         //in case we run an extra row colum, this pass is iterate on CELL.
@@ -450,12 +531,17 @@ void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,
                 vertices_data.metadata(p_y_cell + 1, p_z_cell + 1).end_trim))
     );
 
+    // Normalize QEF coordinates by cell size so conditioning stays consistent across LOD.
+    const int32_t lod = ChunkMath::get_lod(chunk_id);
+    const float cell_size = VoxelEngineConstants::VOXEL_SIZE * static_cast<float>(1 << lod);
+    const float inv_cell_size = (cell_size > 0.0f) ? (1.0f / cell_size) : 1.0f;
+
     for( int32_t x=x_start ; x<x_end ; x++){
 
-        Basis A = Basis();
-        Vector3 b = Vector3();
+        Basis A = Basis(0,0,0,0,0,0,0,0,0);
+        Vector3 b = Vector3(0,0,0);
 
-        Vector3 mass_point=Vector3();
+        Vector3 mass_point=Vector3(0,0,0);
 
         int32_t num_vertices = 0;
 
@@ -486,15 +572,18 @@ void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,
         const uint32_t rear_left_edge_counter = front_left_edge_counter - front_left_changed;
         const uint32_t rear_right_edge_counter = front_right_edge_counter - front_right_changed;
 
+        const Vector3 mid_cell = ChunkMath::vertices_to_world(chunk_id, Vector3(x+0.5f,p_y_cell+0.5f,p_z_cell+0.5f));
+
         auto accumulate_from_edge = [&](bool changed, const VerticesData::EdgeCompute &edge, uint32_t edge_index) {
             if (!changed) {
                 return;
             }
 
             const Vector3 &local_position = edge.local_positions[edge_index];
+            const Vector3 position = (ChunkMath::vertices_to_world(chunk_id, local_position) - mid_cell) * inv_cell_size;
 
-            _accumulate_qef(edge.normals[edge_index], local_position, A, b);
-            mass_point += local_position;
+            _accumulate_qef(edge.normals[edge_index], position, A, b);
+            mass_point += position;
             ++num_vertices;
         };
 
@@ -517,23 +606,42 @@ void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,
 
         if(num_vertices > 0){
 
-            // Temporary surface-net mode: use average of border intersections.
-            const Vector3 final_vertex = _surface_net_vertex(mass_point, num_vertices);
+            // Tikhonov regularization in normalized space (dimensionless).
+            const float a = alpha;
+            
 
             // QEF solve kept for later re-enable.
-            // A[0][0] +=alpha;
-            // A[1][1] +=alpha;
-            // A[2][2] +=alpha;
+            A[0][0] +=a;
+            A[1][1] +=a;
+            A[2][2] +=a;
 
-            // mass_point/=num_vertices;
+            mass_point/=num_vertices;
 
-            // b+= alpha*mass_point;
+            b+= a*mass_point;
 
-            // Vector3 final_vertex = A.inverse().xform(b);
+            //const float det = A.determinant();
+            // if (std::abs(det) < 1.0f) {
+            //     print_line(vformat("bad determinant in fourth_pass at cell (%d, %d), x=%d: det=%f, num_vertices=%d",
+            //         p_y_cell,
+            //         p_z_cell,
+            //         x,
+            //         det,
+            //         num_vertices));
+            // }
 
-            // Vector3 min_bound = Vector3(x, p_y_cell, p_z_cell);
-            // Vector3 max_bound = min_bound + Vector3(1.0f, 1.0f, 1.0f);
+            Vector3 qef_solution;
+            const bool solved = solve_linear_system_3x3(A, b, qef_solution);
+            const Vector3 final_vertex_world = ((solved ? qef_solution : mass_point) * cell_size) + mid_cell;
+            Vector3 final_vertex = ChunkMath::world_to_vertices(chunk_id,final_vertex_world);
+            
+
+            // const float margin = 0.1f;
+
+            // Vector3 min_bound = Vector3(x+margin, p_y_cell+margin, p_z_cell+margin);
+            // Vector3 max_bound = min_bound + Vector3(1.0f-margin, 1.0f-margin, 1.0f-margin);
             // final_vertex = final_vertex.clamp(min_bound, max_bound);
+
+            //const Vector3 final_vertex = mass_point;
 
             vertices_data.points[vertices_counter]= final_vertex;
 
@@ -556,6 +664,151 @@ void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,
 
     }
 
+}
+
+void MeshBufferClass::fifth_pass(const int32_t p_y_qcell, const int32_t p_z_qcell) {
+
+    // Need to check all code, been partialy generated by Gemini 3 pro
+    
+    const int32_t y = p_y_qcell;
+    const int32_t z = p_z_qcell;
+
+    // Local copy of point counters for the 4 rows in YZ
+    uint32_t pt_00 = vertices_data.metadata.cum(y, z).point - 1;
+    uint32_t pt_10 = vertices_data.metadata.cum(y + 1, z).point - 1;
+    uint32_t pt_01 = vertices_data.metadata.cum(y, z + 1).point - 1;
+    uint32_t pt_11 = vertices_data.metadata.cum(y + 1, z + 1).point - 1;
+
+    // Edge counters starting exactly where the previous pass left them
+    uint32_t x_edge_counter = vertices_data.metadata.cum(y + 1, z + 1).x_edge - 1;
+    uint32_t y_edge_counter = vertices_data.metadata.cum(y + 1, z + 1).y_edge - 1;
+    uint32_t z_edge_counter = vertices_data.metadata.cum(y + 1, z + 1).z_edge - 1;
+
+    // Memory buffer indexing for the previous iteration
+    uint32_t prev_x_idx_00 = 0, prev_x_idx_10 = 0, prev_x_idx_01 = 0, prev_x_idx_11 = 0;
+
+    // Pre-calculate cumulative offsets for vertex array partitioning 
+    const auto& max_meta = vertices_data.metadata.cum(vertices_data.height - 1, vertices_data.depth - 1);
+    const uint32_t y_offset = max_meta.x_edge;
+    const uint32_t z_offset = max_meta.x_edge + max_meta.y_edge;
+
+    auto& vertices = vertices_data.vertices;
+
+    // Helper lambda to determine if a specific cell contains a point
+    auto _cell_has_vertex = [&](int32_t cx, int32_t cy, int32_t cz) -> bool {
+        const uint32_t tl = vertices_data.x_edge_cases(cx, cy, cz);
+        const uint32_t tr = vertices_data.x_edge_cases(cx, cy + 1, cz);
+        const uint32_t bl = vertices_data.x_edge_cases(cx, cy, cz + 1);
+        const uint32_t br = vertices_data.x_edge_cases(cx, cy + 1, cz + 1);
+
+        if (_edge_change(tl) || _edge_change(tr) || _edge_change(bl) || _edge_change(br)) return true;
+        if (_transversal_change(tl, tr, true) || _transversal_change(bl, br, true)) return true;
+        if (_transversal_change(tl, bl, true) || _transversal_change(tr, br, true)) return true;
+        if (_transversal_change(tl, tr, false) || _transversal_change(bl, br, false)) return true;
+        if (_transversal_change(tl, bl, false) || _transversal_change(tr, br, false)) return true;
+        
+        return false;
+    };
+
+    for (int32_t x = 0; x < vertices_data.width; x++) {
+
+        bool v00 = _cell_has_vertex(x, y, z);
+        bool v10 = _cell_has_vertex(x, y + 1, z);
+        bool v01 = _cell_has_vertex(x, y, z + 1);
+        bool v11 = _cell_has_vertex(x, y + 1, z + 1);
+
+        // Capture the vertex ID (index) for the current cells
+        uint32_t cur_idx_00 = pt_00;
+        uint32_t cur_idx_10 = pt_10;
+        uint32_t cur_idx_01 = pt_01;
+        uint32_t cur_idx_11 = pt_11;
+
+        // Decrement counters exactly like the QEF pass to maintain synchronization
+        if (v00) pt_00--;
+        if (v10) pt_10--;
+        if (v01) pt_01--;
+        if (v11) pt_11--;
+
+        uint32_t case_x = vertices_data.x_edge_cases(x, y + 1, z + 1);
+        bool x_changed = _edge_change(case_x);
+
+        if (x_changed) {
+            bool positive = (case_x == 1);
+            
+            // X-edge Quad indices (using the IDs of the 4 surrounding cells on the YZ plane)
+            uint32_t idA = cur_idx_00;
+            uint32_t idB = cur_idx_10;
+            uint32_t idC = cur_idx_11;
+            uint32_t idD = cur_idx_01;
+
+            uint32_t write_idx = x_edge_counter * 6;
+            
+            // Write IDs to the index buffer (with proper winding order)
+            if (positive) {
+                vertices[write_idx + 0] = idA; vertices[write_idx + 1] = idB; vertices[write_idx + 2] = idC;
+                vertices[write_idx + 3] = idA; vertices[write_idx + 4] = idC; vertices[write_idx + 5] = idD;
+            } else {
+                vertices[write_idx + 0] = idA; vertices[write_idx + 1] = idD; vertices[write_idx + 2] = idC;
+                vertices[write_idx + 3] = idA; vertices[write_idx + 4] = idC; vertices[write_idx + 5] = idB;
+            }
+            x_edge_counter--;
+        }
+
+        // Generate Y & Z Edge Quads mapping cells behind it
+        if (x > 0) {
+            uint32_t case_y = vertices_data.x_edge_cases(x, y + 2, z + 1);
+            bool y_changed = _transversal_change(case_x, case_y, true);
+
+            if (y_changed) {
+                // Y-edge Quad indices (spans across the X axis, so we mix prev_x and cur_x)
+                uint32_t idA = prev_x_idx_10;
+                uint32_t idB = cur_idx_10;
+                uint32_t idC = cur_idx_11;
+                uint32_t idD = prev_x_idx_11;
+
+                bool positive = (_transversal_combination(case_x, case_y, true) == 1);
+                uint32_t write_idx = (y_offset + y_edge_counter) * 6;
+
+                if (positive) {
+                    vertices[write_idx + 0] = idA; vertices[write_idx + 1] = idD; vertices[write_idx + 2] = idC;
+                    vertices[write_idx + 3] = idA; vertices[write_idx + 4] = idC; vertices[write_idx + 5] = idB;
+                } else {
+                    vertices[write_idx + 0] = idA; vertices[write_idx + 1] = idB; vertices[write_idx + 2] = idC;
+                    vertices[write_idx + 3] = idA; vertices[write_idx + 4] = idC; vertices[write_idx + 5] = idD;
+                }
+                y_edge_counter--;
+            }
+
+            uint32_t case_z = vertices_data.x_edge_cases(x, y + 1, z + 2);
+            bool z_changed = _transversal_change(case_x, case_z, true);
+
+            if (z_changed) {
+                // Z-edge Quad indices
+                uint32_t idA = prev_x_idx_01;
+                uint32_t idB = cur_idx_01;
+                uint32_t idC = cur_idx_11;
+                uint32_t idD = prev_x_idx_11;
+
+                bool positive = (_transversal_combination(case_x, case_z, true) == 1);
+                uint32_t write_idx = (z_offset + z_edge_counter) * 6;
+
+                if (positive) {
+                    vertices[write_idx + 0] = idA; vertices[write_idx + 1] = idB; vertices[write_idx + 2] = idC;
+                    vertices[write_idx + 3] = idA; vertices[write_idx + 4] = idC; vertices[write_idx + 5] = idD;
+                } else {
+                    vertices[write_idx + 0] = idA; vertices[write_idx + 1] = idD; vertices[write_idx + 2] = idC;
+                    vertices[write_idx + 3] = idA; vertices[write_idx + 4] = idC; vertices[write_idx + 5] = idB;
+                }
+                z_edge_counter--;
+            }
+        }
+
+        // Push current points indices to previous for next iteration step
+        prev_x_idx_00 = cur_idx_00;
+        prev_x_idx_10 = cur_idx_10;
+        prev_x_idx_01 = cur_idx_01;
+        prev_x_idx_11 = cur_idx_11;
+    }
 }
 
 void MeshBufferClass::execute_on_self(){
@@ -598,15 +851,48 @@ void MeshBufferClass::execute_on_self(){
         }
     }
 
-    const Vector3 zero_point = Vector3(0.0f, 0.0f, 0.0f);
-
-    uint32_t empty_count = 0;
-    for (const Vector3 &point : vertices_data.points) {
-        if (point == zero_point) {
-            empty_count++;
+    // Fifth pass: generate vertices using QEF solver
+    for (int32_t z = 0; z < vertices_data.depth - 2; ++z) {
+        for (int32_t y = 0; y < vertices_data.height - 2; ++y) {
+            fifth_pass(y, z);
         }
     }
-    if(empty_count>0){
-    print_line(vformat("empty points: %d / %d", empty_count, vertices_data.points.size()));
-    }
+
+
+    // const Vector3 zero_point = Vector3(0.0f, 0.0f, 0.0f);
+
+    // uint32_t empty_count = 0;
+    // for (const Vector3 &point : vertices_data.points) {
+    //     if (point == zero_point) {
+    //         empty_count++;
+    //     }
+    // }
+    // if(empty_count>0){
+    // print_line(vformat("empty points: %d / %d", empty_count, vertices_data.points.size()));
+    // }
+
+    // auto count_empty_edge_positions = [&](const VerticesData::EdgeCompute &edge) {
+    //     uint32_t count = 0;
+    //     for (const Vector3 &pos : edge.local_positions) {
+    //         if (pos == zero_point) {
+    //             count++;
+    //         }
+    //     }
+    //     return count;
+    // };
+
+    // const uint32_t empty_x = count_empty_edge_positions(vertices_data.x_edge);
+    // const uint32_t empty_y = count_empty_edge_positions(vertices_data.y_edge);
+    // const uint32_t empty_z = count_empty_edge_positions(vertices_data.z_edge);
+
+    // if (empty_x > 0) {
+    //     print_line(vformat("empty x_edge: %d / %d", empty_x, vertices_data.x_edge.local_positions.size()));
+    // }
+    // if (empty_y > 0) {
+    //     print_line(vformat("empty y_edge: %d / %d", empty_y, vertices_data.y_edge.local_positions.size()));
+    // }
+    // if (empty_z > 0) {
+    //     print_line(vformat("empty z_edge: %d / %d", empty_z, vertices_data.z_edge.local_positions.size()));
+    // }
+
 }

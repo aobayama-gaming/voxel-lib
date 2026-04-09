@@ -96,7 +96,9 @@ void VoxelEngineClass::_ready() {
             
             generated_distances.set(i, dist);
         }
+        
         set_lod_distances(generated_distances);
+
     } else {
         chunks_to_load_by_lod.resize(lod_distances.size()-1);
     }
@@ -272,7 +274,7 @@ void VoxelEngineClass::load_chunks() {
                 
                 // Dummy load function
                 ChunkClass *chunk = memnew(ChunkClass);
-                chunk->initialize_debug(chunk_pos,sdf);
+                chunk->initialize(chunk_pos,sdf);
                 add_child(chunk);
 
                 chunks.insert(chunk_pos, chunk);
@@ -286,7 +288,23 @@ void VoxelEngineClass::load_chunks() {
 }
 
 void VoxelEngineClass::run_chunk_pipeline() {
+    //dummy implementation without any queue.
     scan_chunks_to_load();
     prepare_chunks_to_load();
     load_chunks();
+}
+
+void VoxelEngineClass::chunk_patching(ChunkClass &chunk){
+    /*
+    Chunk patching is quite simple actually check the six neighbor around the chunk.
+    For inferior chunk if the neighbor is bigger or same size and Ready (at least Inner_Mesh) generate patch.
+    for superior chunk if the neighbor is bigger generate patch
+    */
+
+    const Vector3i chunk_id = chunk.chunk_pos ;
+    const MeshBufferClass &mesh_info = chunk.mesh_info;
+
+    const int32_t lod = ChunkMath::get_lod(chunk_id);
+    const int32_t chunk_size = (1 >> lod)*2;
+
 }

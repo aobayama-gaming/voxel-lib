@@ -71,6 +71,10 @@ struct VerticesData {
 
     // Metadata grid of size (chunk_size +1)^2
     struct Metadata {
+
+        int32_t x_start_trim = 0;
+        int32_t x_end_trim = 0;
+
         int32_t start_trim = 0;
         int32_t end_trim = 0;
         struct Counts {
@@ -172,7 +176,7 @@ struct VerticesData {
     EdgeCompute z_edge;
 
     std::vector<Vector3> points;
-    std::vector<int32_t> vertices;
+    std::vector<uint32_t> vertices;
 
     void configure(int32_t p_width, int32_t p_height, int32_t p_depth) { // The size of this should one unit bigger (difference between center and corner)
         width = p_width;
@@ -193,12 +197,13 @@ struct VerticesData {
         y_edge.configure(max_meta.y_edge);
         z_edge.configure(max_meta.z_edge);
 
+        // over-allocate (because on edge we don t create the quad, actually don't care ? )
+
+        vertices.resize(static_cast<size_t>((max_meta.x_edge+max_meta.y_edge+max_meta.z_edge)*6));
+
 
     }
 
-    void configure_points(int32_t p_count) {
-        points.resize(static_cast<size_t>(p_count));
-    }
 
     void configure_vertices(int32_t p_count) {
         vertices.resize(static_cast<size_t>(p_count));
@@ -234,8 +239,8 @@ chunk wise explanation :
 Need to allocate all grid vertices as boolean.
 
 1. First pass, iterate x-edge. along the x-edges to fill the boolean grid, count the number of time sign change happens, mark end and start trimming in metadata.
-2. Second pass, iterate ~~edges~~ cell. Using the boolean grid, count the number of time sign change in y and z axis. Use the trimming but be carefull on wether or not we have parallel traversal. Count also the number of point (by using the fact that any sign change equal to a point)
-
+2. Second pass, iterate ~~edges~~ cell. Using the boolean grid, count the number of time sign change in y and z axis. Use the trimming but be carefull on wether or not we have parallel traversal.
+2.5 Iterate on the cell for having the number of points
 At the end of the second step we have the memory footprint of everything, count of traversal give the number of quad and number of point.
 Allocate this memory.
 
