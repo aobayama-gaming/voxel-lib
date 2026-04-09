@@ -40,7 +40,7 @@ private:
 	MeshInstance3D *z_edge_point_mesh_instance = nullptr;
 	SDFBase *sdf=nullptr;
 
-	ChunkState state = ChunkState::DIRTY;
+	
 
 	void _build_debug_mesh();
 	void _build_debug_mesh_point();
@@ -48,6 +48,8 @@ private:
 	void _build_chunk_mesh();
 
 public:
+
+	ChunkState state = ChunkState::DIRTY;
 
 	Vector3i chunk_pos; // The position of the chunk in chunk coordinates (not world coordinates). This is used to calculate the LOD and the position of the chunk in the world.
 	MeshBufferClass mesh_info;

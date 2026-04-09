@@ -5,7 +5,32 @@
 
 #include "chunk_math.hpp"
 
+#include <algorithm>
 #include <cmath>
+
+namespace {
+bool _chunk_is_outside_sdf(const SDFBase &sdf, const Vector3i &chunk_pos) {
+    const float chunk_size = ChunkMath::world_chunk_size(chunk_pos);
+    const float half_size = chunk_size * 0.25f;
+    const float chunk_outer_radius = chunk_size * 0.8660254f;
+    const Vector3 chunk_center = ChunkMath::chunk_to_world(chunk_pos);
+
+    for (int corner = 0; corner < 8; ++corner) {
+        const Vector3 corner_offset(
+            (corner & 1) ? half_size : -half_size,
+            (corner & 2) ? half_size : -half_size,
+            (corner & 4) ? half_size : -half_size
+        );
+
+        const float corner_distance = std::abs(sdf.evaluate(chunk_center + corner_offset));
+        if (corner_distance <= chunk_outer_radius) {
+            return false;
+        }
+    }
+
+    return true;
+}
+}
 
 
 
@@ -57,7 +82,8 @@ void VoxelEngineClass::_ready() {
         camera = EditorInterface::get_singleton()->get_editor_viewport_3d()->get_camera_3d();
     }
 
-    if (lod_distances.is_empty()) {
+    //if (lod_distances.is_empty()) {
+    if (true) {
         //hard coded base distances for LOD levels. Can be modified later to be more dynamic or to be set in the editor.
         // const float phi = 2.0f;
         // const float alpha = 2.0f;
@@ -73,28 +99,38 @@ void VoxelEngineClass::_ready() {
         // }
         // Configuration
         const int lod_levels = 15;
-        
-        // --- SOTA Parameters ---
-        const float target_pixel_error = 0.1f;   // How many pixels of "jitter" is acceptable
-        const float base_mesh_error = 0.01f;      // Real-world detail loss (e.g., 0.01 meters)
-        const float viewport_height = 1080.0f;    // Target resolution
-        const float fov_rad = 75.0f * (3.14f / 180.0f); 
 
-        // 1. Calculate focal length based on FOV
-        // This makes LODs scale correctly when the player zooms in/out
-        float focal_length = viewport_height / (2.0f * std::tan(fov_rad * 0.5f));
+        // LOD thresholds are stored in chunk-coordinate units because the scan
+        // logic compares them against chunk-space distances.
+        // Keep LOD0 until one base voxel is about ~1 pixel on screen.
+        const float target_pixel_error = 5.0f; // acceptable projected geometric error in pixels
+        const float viewport_height = 1080.0f;
+        const float fov_rad = 75.0f * (3.14159265f / 180.0f);
+        const float focal_length = viewport_height / (2.0f * std::tan(fov_rad * 0.5f));
 
         generated_distances.resize(lod_levels + 1);
 
+        float previous_distance = 0.0f;
         for (int i = 0; i < lod_levels + 1; ++i) {
-            // 2. Geometric error progression
-            // Instead of distance doubling, we assume mesh detail halves per level
-            float geometric_error = base_mesh_error * std::pow(1.5f, i);
+            // Geometric error follows voxel size per LOD (voxel doubles each level).
+            const float lod_voxel_size_world = VoxelEngineConstants::VOXEL_SIZE * static_cast<float>(1 << i);
+            const float geometric_error_world = lod_voxel_size_world * 0.5f;
 
-            // 3. The SOTA Formula: Distance = (Error * FocalLength) / PixelThreshold
-            float dist = (geometric_error * focal_length) / target_pixel_error;
-            
-            generated_distances.set(i, dist);
+            // Compute threshold in world units, then convert to chunk-coordinate units.
+            // One chunk coordinate step equals CHUNK_DIMENSION / 2 in world units.
+            float dist_world = (geometric_error_world * focal_length) / target_pixel_error;
+            float dist_chunk = dist_world / (VoxelEngineConstants::CHUNK_DIMENSION * 0.5f);
+
+            // Keep thresholds strictly increasing and avoid near-zero first level.
+            if (i == 0 && dist_chunk < 1.0f) {
+                dist_chunk = 1.0f;
+            }
+            if (dist_chunk <= previous_distance) {
+                dist_chunk = previous_distance + 1.0f;
+            }
+
+            generated_distances.set(i, dist_chunk);
+            previous_distance = dist_chunk;
         }
         
         set_lod_distances(generated_distances);
@@ -105,9 +141,11 @@ void VoxelEngineClass::_ready() {
 
     print_line("LOD Distances: ");
     for (int i = 0; i < lod_distances.size()-1; ++i) {
-        print_line(vformat("LOD %d: %f", i, lod_distances[i]*VoxelEngineConstants::CHUNK_DIMENSION)); // Convert from chunk distance to world distance for easier understanding.
+        print_line(vformat("LOD %d: %f", i, lod_distances[i] * (VoxelEngineConstants::CHUNK_DIMENSION * 0.5f))); // Convert from chunk-coord distance to world distance.
     }
-    print_line(vformat("Render Distance : %f", lod_distances[lod_distances.size()-1]*VoxelEngineConstants::CHUNK_DIMENSION));
+    print_line(vformat("Render Distance : %f", lod_distances[lod_distances.size()-1] * (VoxelEngineConstants::CHUNK_DIMENSION * 0.5f)));
+    chunks.max_lod=lod_distances.size()-2;
+
     //DEBUG
     SDFBase *sdf = memnew(SDFDummy);
     set_sdf(sdf);
@@ -197,8 +235,7 @@ void VoxelEngineClass::prepare_chunks_to_load() {
             
             const int lod = ChunkMath::get_lod(chunk_pos);
 
-            const float chunk_outer_radius = ChunkMath::world_chunk_size(chunk_pos) * 0.8660254f; // radius that contain the cube
-            if (abs(sdf->evaluate(ChunkMath::chunk_to_world(chunk_pos))) > chunk_outer_radius) {
+            if (_chunk_is_outside_sdf(*sdf, chunk_pos)) {
                 empty_chunks.insert(chunk_pos);
             }
             else {
@@ -298,7 +335,7 @@ void VoxelEngineClass::chunk_patching(ChunkClass &chunk){
     /*
     Chunk patching is quite simple actually check the six neighbor around the chunk.
     For inferior chunk if the neighbor is bigger or same size and Ready (at least Inner_Mesh) generate patch.
-    for superior chunk if the neighbor is bigger generate patch
+    for superior chunk if the neighbor is bigger and ready generate patch.
     */
 
     const Vector3i chunk_id = chunk.chunk_pos ;
@@ -306,5 +343,48 @@ void VoxelEngineClass::chunk_patching(ChunkClass &chunk){
 
     const int32_t lod = ChunkMath::get_lod(chunk_id);
     const int32_t chunk_size = (1 >> lod)*2;
+
+    /*
+    Need to do two variation of the algorithm for front and backs faces and around faces (due to x_edge).　
+    Need to have two variations of the algorithm chunk arrete.
+    Need to have a first pass for memory allocation of the extra point/vertices dependant on the lod of the neighbor.
+    the inner position should be taken from the classical indices, the duplicate point borrowed from other lod should get a new indices +max
+    For each face there is only one quad in the case that LOD are the same. 
+    */
+
+    // case 1 : x_edge edges
+
+    const Vector3i top_neighbor_pos = chunk_id - Vector3i(0,chunk_size,0);
+    const Vector3i top_left_neighbor_pos = chunk_id - Vector3i(0,chunk_size,chunk_size);
+    const Vector3i left_neighbor_pos = chunk_id - Vector3i(0,0,chunk_size);
+
+    ChunkClass* top_neighbor;
+    ChunkClass* top_left_neighbor;
+    ChunkClass* left_neighbor;
+
+    const uint32_t top_neighbor_lod = chunks.get_chunk(top_neighbor_pos,top_neighbor);
+    const uint32_t top_left_neighbor_lod = chunks.get_chunk(top_left_neighbor_pos,top_left_neighbor);
+    const uint32_t left_neighbor_lod = chunks.get_chunk(left_neighbor_pos,left_neighbor);
+
+    if(top_neighbor_lod==-1 || top_left_neighbor_lod==-1 || left_neighbor_lod == -1)
+    {
+        return;
+    }
+    if(top_neighbor->state < ChunkState::INNER_MESH || top_left_neighbor->state < ChunkState::INNER_MESH ||left_neighbor->state < ChunkState::INNER_MESH){
+        return;
+    }
+
+    auto& meta = chunk.mesh_info.vertices_data.metadata(0,0);
+
+    int top_neighbor_x_counter = 0;
+    int top_left_neighbor_x_counter = 0;
+    int left_neighbor_x_counter = 0;
+
+    for(int x=meta.start_trim; x<meta.end_trim;x++){
+
+
+
+    }
+
 
 }

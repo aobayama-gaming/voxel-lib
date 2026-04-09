@@ -73,6 +73,8 @@ Vector3i ChunkMath::get_parent_from_child_until(Vector3i coord, int target_lod) 
     return parent;
 }
 
+
+
 Vector3 ChunkMath::chunk_to_world(Vector3i chunk_coord) {
     // Convert chunk coordinates to world coordinates. This is done by multiplying the chunk coordinates by the chunk size and voxel size.
 
@@ -83,15 +85,73 @@ Vector3 ChunkMath::chunk_to_world(Vector3i chunk_coord) {
     );
 }
 
+constexpr inline float edge_width = VoxelEngineConstants::VOXEL_SIZE/100;
+
+// The general-purpose helper function from above
+void mapRange(float value, float inMin, float inMax, float outMin, float outMax, float& out) {
+    if( value<=inMin || value> inMax){return;}
+    float t = (value - inMin) / (inMax - inMin);
+    out = outMin + t * (outMax - outMin);
+}
+
+// float _direct_transform(float inputValue,float chunk_dim){
+
+//     const float halfEdge = edge_width / 2.0f;
+//     const float CHUNK_SIZE = static_cast<float>(VoxelEngineConstants::CHUNK_SIZE);
+
+//     float out= 0.0f;
+
+//     mapRange(inputValue, 0.0f, 1.0f, -halfEdge, halfEdge,out);
+//     mapRange(inputValue, 1.0f, CHUNK_SIZE - 1.0f, halfEdge, chunk_dim-halfEdge,out);
+//     mapRange(inputValue, CHUNK_SIZE - 1.0f, CHUNK_SIZE, chunk_dim-halfEdge, chunk_dim+halfEdge,out);
+
+//     return out;
+
+// }
+
+// float _inverse_transform(float inputValue,float chunk_dim){
+
+//     const float halfEdge = edge_width / 2.0f;
+//     const float CHUNK_SIZE = static_cast<float>(VoxelEngineConstants::CHUNK_SIZE);
+
+//     float out= 0.0f;
+
+//     mapRange(inputValue, -halfEdge, halfEdge,0.0f, 1.0f,out);
+//     mapRange(inputValue, halfEdge, chunk_dim-halfEdge, 1.0f, CHUNK_SIZE - 1.0f,out);
+//     mapRange(inputValue, chunk_dim-halfEdge, chunk_dim+halfEdge, CHUNK_SIZE - 1.0f, CHUNK_SIZE,out);
+
+//     return out;
+// }
+
+float _direct_transform(float inputValue,float chunk_dim){
+
+    const float halfEdge = edge_width / 2.0f;
+    const float CHUNK_SIZE = static_cast<float>(VoxelEngineConstants::CHUNK_SIZE);
+
+    float out= 0.0f;
+
+    mapRange(inputValue, 0.0f, CHUNK_SIZE, 0, chunk_dim,out);
+
+    return out;
+
+}
+
+float _inverse_transform(float inputValue,float chunk_dim){
+
+    const float halfEdge = edge_width / 2.0f;
+    const float CHUNK_SIZE = static_cast<float>(VoxelEngineConstants::CHUNK_SIZE);
+
+    float out= 0.0f;
+
+    mapRange(inputValue,  0, chunk_dim,0.0f, CHUNK_SIZE,out);
+
+    return out;
+}
+
 Vector3 ChunkMath::vertices_to_world(Vector3i chunk_coord, Vector3 local_coord) {
     // Convert a vertex coordinate inside a chunk to a world-space position.
-    // Mapping contract:
-    // - 0 maps to the chunk minimum corner
-    // - 0.5 maps to the center of the first cell
-    // - CHUNK_SIZE + 1 maps to the opposite chunk corner
-    // chunk_to_world() returns the chunk center, so we offset from min corner.
+    // Uses fixed-width edge scheme with _direct_transform.
     const float chunk_size = world_chunk_size(chunk_coord);
-    const float vertex_step = chunk_size / static_cast<float>(VoxelEngineConstants::CHUNK_SIZE );
     const Vector3 chunk_center = chunk_to_world(chunk_coord);
     const Vector3 chunk_min_corner = chunk_center - Vector3(
         chunk_size * 0.5f,
@@ -100,24 +160,29 @@ Vector3 ChunkMath::vertices_to_world(Vector3i chunk_coord, Vector3 local_coord) 
     );
 
     return chunk_min_corner + Vector3(
-        static_cast<float>(local_coord.x) * vertex_step,
-        static_cast<float>(local_coord.y) * vertex_step,
-        static_cast<float>(local_coord.z) * vertex_step
+        _direct_transform(static_cast<float>(local_coord.x), chunk_size),
+        _direct_transform(static_cast<float>(local_coord.y), chunk_size),
+        _direct_transform(static_cast<float>(local_coord.z), chunk_size)
     );
 }
 
 Vector3 ChunkMath::world_to_vertices(Vector3i chunk_coord, Vector3 world_coord) {
     // Convert a world-space position back to the chunk's vertex-local coordinate system.
+    // Uses fixed-width edge scheme with _inverse_transform.
     const float chunk_size = world_chunk_size(chunk_coord);
-    const float vertex_step = chunk_size / static_cast<float>(VoxelEngineConstants::CHUNK_SIZE);
     const Vector3 chunk_center = chunk_to_world(chunk_coord);
     const Vector3 chunk_min_corner = chunk_center - Vector3(
         chunk_size * 0.5f,
         chunk_size * 0.5f,
         chunk_size * 0.5f
     );
-
-    return (world_coord - chunk_min_corner) / vertex_step;
+    
+    Vector3 local_offset = world_coord - chunk_min_corner;
+    return Vector3(
+        _inverse_transform(local_offset.x, chunk_size),
+        _inverse_transform(local_offset.y, chunk_size),
+        _inverse_transform(local_offset.z, chunk_size)
+    );
 }
 
 float ChunkMath::world_chunk_size(Vector3i chunk_coord) {
@@ -148,3 +213,40 @@ Vector3i ChunkMath::world_to_chunk(Vector3 world_coord) {
         cell_z * 2 + 1
     );
 }
+
+// Vector3 ChunkMath::vertices_to_world(Vector3i chunk_coord, Vector3 local_coord) {
+//     // Convert a vertex coordinate inside a chunk to a world-space position.
+//     // Mapping contract:
+//     // - 0 maps to the chunk minimum corner
+//     // - 0.5 maps to the center of the first cell
+//     // - CHUNK_SIZE + 1 maps to the opposite chunk corner
+//     // chunk_to_world() returns the chunk center, so we offset from min corner.
+//     const float chunk_size = world_chunk_size(chunk_coord);
+//     const float vertex_step = chunk_size / static_cast<float>(VoxelEngineConstants::CHUNK_SIZE );
+//     const Vector3 chunk_center = chunk_to_world(chunk_coord);
+//     const Vector3 chunk_min_corner = chunk_center - Vector3(
+//         chunk_size * 0.5f,
+//         chunk_size * 0.5f,
+//         chunk_size * 0.5f
+//     );
+
+//     return chunk_min_corner + Vector3(
+//         static_cast<float>(local_coord.x) * vertex_step,
+//         static_cast<float>(local_coord.y) * vertex_step,
+//         static_cast<float>(local_coord.z) * vertex_step
+//     );
+// }
+
+// Vector3 ChunkMath::world_to_vertices(Vector3i chunk_coord, Vector3 world_coord) {
+//     // Convert a world-space position back to the chunk's vertex-local coordinate system.
+//     const float chunk_size = world_chunk_size(chunk_coord);
+//     const float vertex_step = chunk_size / static_cast<float>(VoxelEngineConstants::CHUNK_SIZE);
+//     const Vector3 chunk_center = chunk_to_world(chunk_coord);
+//     const Vector3 chunk_min_corner = chunk_center - Vector3(
+//         chunk_size * 0.5f,
+//         chunk_size * 0.5f,
+//         chunk_size * 0.5f
+//     );
+
+//     return (world_coord - chunk_min_corner) / vertex_step;
+// }

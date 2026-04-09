@@ -14,17 +14,34 @@ public:
     // }
 
     // GRAD OF 1 IS IMPORTANT !!!!
-    float evaluate(const Vector3 &p_world_pos) const override {
-        return -sqrt(p_world_pos.y*p_world_pos.y + p_world_pos.x*p_world_pos.x + p_world_pos.z*p_world_pos.z)  + 10.0f;
-    }
+    // float evaluate(const Vector3 &p_world_pos) const override {
+    //     return -sqrt(p_world_pos.y*p_world_pos.y + p_world_pos.x*p_world_pos.x + p_world_pos.z*p_world_pos.z)  + 10.0f;
+    // }
 
-    Vector3 evaluate_normal(const Vector3 &p_world_pos) const override {
-        const float len_sq = p_world_pos.length_squared();
-        if (len_sq <= 1e-12f) {
-            return Vector3(0.0f, 1.0f, 0.0f);
-        }
-        return p_world_pos / std::sqrt(len_sq);
+    // Vector3 evaluate_normal(const Vector3 &p_world_pos) const override {
+    //     const float len_sq = p_world_pos.length_squared();
+    //     if (len_sq <= 1e-12f) {
+    //         return Vector3(0.0f, 1.0f, 0.0f);
+    //     }
+    //     return p_world_pos / std::sqrt(len_sq);
+    // }
+
+    // Sinusoidal terrain-like SDF idea:
+    float evaluate(const Vector3 &p_world_pos) const override {
+        const float wave_x = std::sin(p_world_pos.x * 1.5f);
+        const float wave_z = std::sin(p_world_pos.z * 1.2f);
+        const float ripple = 0.35f*std::sin((p_world_pos.x + p_world_pos.z) * 2.0f);
+        return -p_world_pos.y + (wave_x + wave_z + ripple);
     }
+    
+    // Sinusoidal blob idea:
+    // float evaluate(const Vector3 &p_world_pos) const override {
+    //     const float r = p_world_pos.length();
+    //     const float wobble = 0.35f * std::sin(p_world_pos.x * 2.0f)
+    //         * std::sin(p_world_pos.y * 2.0f)
+    //         * std::sin(p_world_pos.z * 2.0f);
+    //     return r - (3.0f + wobble);
+    // }
 
     // Periodic sphere SDF using modulo-like coordinate wrapping.
     
