@@ -10,7 +10,7 @@ public:
     
     // plane
     // float evaluate(const Vector3 &p_world_pos) const override {
-    //     return p_world_pos.y + 1.0f;
+    //     return -p_world_pos.y - 1.0f;
     // }
 
     // GRAD OF 1 IS IMPORTANT !!!!
@@ -30,8 +30,8 @@ public:
     float evaluate(const Vector3 &p_world_pos) const override {
         const float wave_x = std::sin(p_world_pos.x * 1.5f);
         const float wave_z = std::sin(p_world_pos.z * 1.2f);
-        const float ripple = 0.35f*std::sin((p_world_pos.x + p_world_pos.z) * 2.0f);
-        return -p_world_pos.y + (wave_x + wave_z + ripple);
+        //const float ripple = 0.35f*std::sin((p_world_pos.x + p_world_pos.z) * 2.0f);
+        return -p_world_pos.y + (wave_x + wave_z );
     }
     
     // Sinusoidal blob idea:

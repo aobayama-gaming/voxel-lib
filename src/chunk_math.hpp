@@ -23,6 +23,8 @@ namespace ChunkMath{
     Vector3 vertices_to_world(Vector3i chunk_coord, Vector3 local_coord);
     Vector3 world_to_vertices(Vector3i chunk_coord, Vector3 world_coord);
 
+    float cell_size(Vector3i chunk_coord);// not implemented
+    
     float world_chunk_size(Vector3i chunk_coord);
     float world_chunk_spherical_radius(Vector3i chunk_coord);
 }

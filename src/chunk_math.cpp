@@ -125,27 +125,19 @@ void mapRange(float value, float inMin, float inMax, float outMin, float outMax,
 
 float _direct_transform(float inputValue,float chunk_dim){
 
-    const float halfEdge = edge_width / 2.0f;
-    const float CHUNK_SIZE = static_cast<float>(VoxelEngineConstants::CHUNK_SIZE);
 
-    float out= 0.0f;
+    const float CHUNK_SIZE = static_cast<float>(VoxelEngineConstants::CHUNK_SIZE-1.0f);
 
-    mapRange(inputValue, 0.0f, CHUNK_SIZE, 0, chunk_dim,out);
-
-    return out;
+    return  inputValue*chunk_dim/CHUNK_SIZE;
 
 }
 
 float _inverse_transform(float inputValue,float chunk_dim){
 
-    const float halfEdge = edge_width / 2.0f;
-    const float CHUNK_SIZE = static_cast<float>(VoxelEngineConstants::CHUNK_SIZE);
+    const float CHUNK_SIZE = static_cast<float>(VoxelEngineConstants::CHUNK_SIZE-1.0f);
 
-    float out= 0.0f;
+    return inputValue*CHUNK_SIZE/chunk_dim;
 
-    mapRange(inputValue,  0, chunk_dim,0.0f, CHUNK_SIZE,out);
-
-    return out;
 }
 
 Vector3 ChunkMath::vertices_to_world(Vector3i chunk_coord, Vector3 local_coord) {

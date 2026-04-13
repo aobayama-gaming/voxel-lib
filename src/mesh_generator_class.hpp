@@ -7,11 +7,19 @@
 
 #include "godot_cpp/classes/engine.hpp"
 #include "godot_cpp/classes/node.hpp"
+#include "godot_cpp/classes/node.hpp"
+#include "godot_cpp/templates/hash_map.hpp"
 #include "voxel_constant.h"
 
 #include "sdf_base.h"
 
 using namespace godot;
+
+namespace MeshEdgeUtils {
+bool edge_change(uint32_t edge_case);
+bool transversal_change(uint32_t origin_edge, uint32_t paired_edge, bool front);
+uint32_t transversal_combination(uint32_t origin_edge, uint32_t paired_edge, bool front);
+}
 
 struct VerticesData {
 
@@ -175,8 +183,13 @@ struct VerticesData {
     EdgeCompute y_edge;
     EdgeCompute z_edge;
 
+    HashMap<Vector3i,Vector3*> edge_cache;
+
     std::vector<Vector3> points;
     std::vector<uint32_t> vertices;
+
+    TypedArray<Vector3> outer_point;
+    TypedArray<int> outer_vertices;
 
     void configure(int32_t p_width, int32_t p_height, int32_t p_depth) { // The size of this should one unit bigger (difference between center and corner)
         width = p_width;
@@ -260,10 +273,7 @@ some metadata should be added later for streamlining the sewing between LOD
 class MeshBufferClass {
 
 private:
-
-    bool _edge_change(uint32_t edge_case);
-    bool _transversal_change(uint32_t origin_edge, uint32_t paired_edge, bool front);
-    uint32_t _transversal_combination(uint32_t origin_edge, uint32_t paired_edge, bool front);
+    bool _cell_has_point(int32_t x, int32_t y, int32_t z);
 
     void _find_edge_intersection(const Vector3i &start_point, const Vector3i &end_point, const uint32_t edge_case, VerticesData::EdgeCompute &edge_data, uint32_t &index );// This is the call to find the mid position and normal.
 
@@ -284,6 +294,8 @@ public:
     void third_pass(const int32_t p_y_edge,const int32_t p_z_edge);
     void fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,const float_t alpha);
     void fifth_pass(const int32_t p_y_qcell,const int32_t p_z_qcell);
+
+    void cache_edge();
 
     void execute_on_self(); //serialised one chunk execution.
 

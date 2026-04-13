@@ -57,6 +57,7 @@ public:
     void _ready() override;
 	void initialize(const Vector3i &p_chunk_pos, SDFBase *sdf);
 	void initialize_debug(const Vector3i &p_chunk_pos, SDFBase *sdf);
+	void rebuild_mesh();
 	ChunkClass() = default;
 	~ChunkClass() override = default;
 

@@ -4,7 +4,7 @@
 
 #include <cmath>
 
-inline constexpr int BINARY_SEARCH_STEP = 8;
+inline constexpr int BINARY_SEARCH_STEP = 5;
 
 namespace {
 
@@ -100,7 +100,7 @@ void MeshBufferClass::first_pass(const int32_t p_y_edge,const int32_t p_z_edge){
 
             vertices_data.x_edge_cases(Vector3i(x-1,p_y_edge,p_z_edge)) = edge_case;
 
-            if(_edge_change(edge_case)){ // sign change
+            if(MeshEdgeUtils::edge_change(edge_case)){ // sign change
 
                 if(first_change){
                     first_change=false;
@@ -172,23 +172,23 @@ void MeshBufferClass::second_pass(const int32_t p_y_cell,const int32_t p_z_cell)
         const uint32_t bottom_left_case = vertices_data.x_edge_cases(x,p_y_cell,p_z_cell+1);
         const uint32_t bottom_right_case = vertices_data.x_edge_cases(x,p_y_cell+1,p_z_cell+1);
 
-        const bool top_left_changed = _edge_change(top_left_case);//x
-        const bool top_right_changed = _edge_change(top_right_case);//x
-        const bool bottom_left_changed = _edge_change(bottom_left_case);//x
-        const bool bottom_right_changed = _edge_change(bottom_right_case);//x
+        const bool top_left_changed = MeshEdgeUtils::edge_change(top_left_case);//x
+        const bool top_right_changed = MeshEdgeUtils::edge_change(top_right_case);//x
+        const bool bottom_left_changed = MeshEdgeUtils::edge_change(bottom_left_case);//x
+        const bool bottom_right_changed = MeshEdgeUtils::edge_change(bottom_right_case);//x
 
-        const bool front_top_changed = _transversal_change(top_left_case, top_right_case, true); //y
-        const bool front_bottom_changed = _transversal_change(bottom_left_case, bottom_right_case, true); //y
+        const bool front_top_changed = MeshEdgeUtils::transversal_change(top_left_case, top_right_case, true); //y
+        const bool front_bottom_changed = MeshEdgeUtils::transversal_change(bottom_left_case, bottom_right_case, true); //y
 
-        const bool rear_top_changed = _transversal_change(top_left_case, top_right_case, false); //y
-        const bool rear_bottom_changed = _transversal_change(bottom_left_case, bottom_right_case, false); //y
+        const bool rear_top_changed = MeshEdgeUtils::transversal_change(top_left_case, top_right_case, false); //y
+        const bool rear_bottom_changed = MeshEdgeUtils::transversal_change(bottom_left_case, bottom_right_case, false); //y
 
 
-        const bool front_left_changed = _transversal_change(top_left_case, bottom_left_case, true); //z
-        const bool front_right_changed = _transversal_change(top_right_case, bottom_right_case, true); //z
+        const bool front_left_changed = MeshEdgeUtils::transversal_change(top_left_case, bottom_left_case, true); //z
+        const bool front_right_changed = MeshEdgeUtils::transversal_change(top_right_case, bottom_right_case, true); //z
 
-        const bool rear_left_changed = _transversal_change(top_left_case, bottom_left_case, false); //z
-        const bool rear_right_changed = _transversal_change(top_right_case, bottom_right_case, false); //z
+        const bool rear_left_changed = MeshEdgeUtils::transversal_change(top_left_case, bottom_left_case, false); //z
+        const bool rear_right_changed = MeshEdgeUtils::transversal_change(top_right_case, bottom_right_case, false); //z
         
         if(x>0 && x ==start_condition )
         {
@@ -289,45 +289,24 @@ void MeshBufferClass::second_half_pass(const int32_t p_y_cell,const int32_t p_z_
 
     for( int32_t x=x_start ; x<x_end ; x++){
 
-        const uint32_t top_left_case = vertices_data.x_edge_cases(x,p_y_cell,p_z_cell);
-        const uint32_t top_right_case = vertices_data.x_edge_cases(x,p_y_cell+1,p_z_cell);
-        const uint32_t bottom_left_case = vertices_data.x_edge_cases(x,p_y_cell,p_z_cell+1);
-        const uint32_t bottom_right_case = vertices_data.x_edge_cases(x,p_y_cell+1,p_z_cell+1);
 
-        const bool top_left_changed = _edge_change(top_left_case);//x
-        const bool top_right_changed = _edge_change(top_right_case);//x
-        const bool bottom_left_changed = _edge_change(bottom_left_case);//x
-        const bool bottom_right_changed = _edge_change(bottom_right_case);//x
-
-        const bool front_top_changed = _transversal_change(top_left_case, top_right_case, true); //y
-        const bool front_bottom_changed = _transversal_change(bottom_left_case, bottom_right_case, true); //y
-
-        const bool front_left_changed = _transversal_change(top_left_case, bottom_left_case, true); //z
-        const bool front_right_changed = _transversal_change(top_right_case, bottom_right_case, true); //z
-
-        const bool rear_top_changed = _transversal_change(top_left_case, top_right_case, false); //y
-        const bool rear_bottom_changed = _transversal_change(bottom_left_case, bottom_right_case, false); //y
-
-        const bool rear_left_changed = _transversal_change(top_left_case, bottom_left_case, false); //z
-        const bool rear_right_changed = _transversal_change(top_right_case, bottom_right_case, false); //z
-
-        vertices_data.metadata(p_y_cell, p_z_cell).counts.point+= top_left_changed || top_right_changed || bottom_left_changed || bottom_right_changed || front_top_changed || front_bottom_changed || rear_top_changed || rear_bottom_changed || front_left_changed || front_right_changed || rear_left_changed || rear_right_changed ;
+        vertices_data.metadata(p_y_cell, p_z_cell).counts.point+= _cell_has_point(x, p_y_cell, p_z_cell) ;
 
     }
 }
 
-bool MeshBufferClass::_edge_change(uint32_t edge_case)
+bool MeshEdgeUtils::edge_change(uint32_t edge_case)
 {
     return edge_case == 1 || edge_case == 2;
 }
 
-bool MeshBufferClass::_transversal_change(uint32_t origin_edge, uint32_t paired_edge, bool front)
+bool MeshEdgeUtils::transversal_change(uint32_t origin_edge, uint32_t paired_edge, bool front)
 {
     const uint32_t mask = front ? 0b01u : 0b10u;
     return ((origin_edge ^ paired_edge) & mask) != 0;
 }
 
-uint32_t MeshBufferClass::_transversal_combination(uint32_t origin_edge, uint32_t paired_edge, bool front)
+uint32_t MeshEdgeUtils::transversal_combination(uint32_t origin_edge, uint32_t paired_edge, bool front)
 {
     const uint32_t origin_bit = front ? (origin_edge & 0b01u) : ((origin_edge & 0b10u) >> 1);
     const uint32_t paired_bit = front ? (paired_edge & 0b01u) : ((paired_edge & 0b10u) >> 1);
@@ -391,7 +370,7 @@ void MeshBufferClass::third_pass(const int32_t p_y_edge,const int32_t p_z_edge)
         if(!y_max){
 
             const uint32_t neighbor_edge =  vertices_data.x_edge_cases(x,p_y_edge+1,p_z_edge);
-            const uint32_t y_edge = _transversal_combination(x_edge, neighbor_edge, true);
+            const uint32_t y_edge = MeshEdgeUtils::transversal_combination(x_edge, neighbor_edge, true);
 
             _find_edge_intersection(start_position,Vector3i(x,p_y_edge+1,p_z_edge),y_edge,vertices_data.y_edge,y_edge_counter);
         }
@@ -399,7 +378,7 @@ void MeshBufferClass::third_pass(const int32_t p_y_edge,const int32_t p_z_edge)
         if(!z_max){
 
             const uint32_t neighbor_edge =  vertices_data.x_edge_cases(x,p_y_edge,p_z_edge+1);
-            const uint32_t z_edge = _transversal_combination(x_edge, neighbor_edge, true);
+            const uint32_t z_edge = MeshEdgeUtils::transversal_combination(x_edge, neighbor_edge, true);
 
             _find_edge_intersection(start_position,Vector3i(x,p_y_edge,p_z_edge+1),z_edge,vertices_data.z_edge,z_edge_counter);
         }
@@ -416,7 +395,7 @@ void MeshBufferClass::third_pass(const int32_t p_y_edge,const int32_t p_z_edge)
         if(!y_max){
 
             const uint32_t neighbor_edge =  vertices_data.x_edge_cases(x,p_y_edge+1,p_z_edge);
-            const uint32_t y_edge = _transversal_combination(x_edge, neighbor_edge, false);
+            const uint32_t y_edge = MeshEdgeUtils::transversal_combination(x_edge, neighbor_edge, false);
 
             _find_edge_intersection(start_position,Vector3i(x+1,p_y_edge+1,p_z_edge),y_edge,vertices_data.y_edge,y_edge_counter);
         }
@@ -424,7 +403,7 @@ void MeshBufferClass::third_pass(const int32_t p_y_edge,const int32_t p_z_edge)
         if(!z_max){
 
             const uint32_t neighbor_edge =  vertices_data.x_edge_cases(x,p_y_edge,p_z_edge+1);
-            const uint32_t z_edge = _transversal_combination(x_edge, neighbor_edge, false);
+            const uint32_t z_edge = MeshEdgeUtils::transversal_combination(x_edge, neighbor_edge, false);
 
             _find_edge_intersection(start_position,Vector3i(x+1,p_y_edge,p_z_edge+1),z_edge,vertices_data.z_edge,z_edge_counter);
         }
@@ -497,7 +476,7 @@ Vector3 MeshBufferClass::_surface_net_vertex(const Vector3 &mass_point_sum, int3
     return mass_point_sum / static_cast<float>(num_vertices);
 }
 
-void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,const float_t alpha=0.5f){
+void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,const float_t alpha=0.75f){
 
     if( p_y_cell>=vertices_data.height-1 || p_z_cell>=vertices_data.depth-1 ){
         //in case we run an extra row colum, this pass is iterate on CELL.
@@ -534,7 +513,7 @@ void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,
     // Normalize QEF coordinates by cell size so conditioning stays consistent across LOD.
     const int32_t lod = ChunkMath::get_lod(chunk_id);
     const float cell_size = VoxelEngineConstants::VOXEL_SIZE * static_cast<float>(1 << lod);
-    const float inv_cell_size = (cell_size > 0.0f) ? (1.0f / cell_size) : 1.0f;
+    const float inv_cell_size = (1.0f / cell_size);
 
     for( int32_t x=x_start ; x<x_end ; x++){
 
@@ -550,22 +529,22 @@ void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,
         const uint32_t bottom_left_case = vertices_data.x_edge_cases(x,p_y_cell,p_z_cell+1);
         const uint32_t bottom_right_case = vertices_data.x_edge_cases(x,p_y_cell+1,p_z_cell+1);
 
-        const bool top_left_changed = _edge_change(top_left_case);//x
-        const bool top_right_changed = _edge_change(top_right_case);//x
-        const bool bottom_left_changed = _edge_change(bottom_left_case);//x
-        const bool bottom_right_changed = _edge_change(bottom_right_case);//x
+        const bool top_left_changed = MeshEdgeUtils::edge_change(top_left_case);//x
+        const bool top_right_changed = MeshEdgeUtils::edge_change(top_right_case);//x
+        const bool bottom_left_changed = MeshEdgeUtils::edge_change(bottom_left_case);//x
+        const bool bottom_right_changed = MeshEdgeUtils::edge_change(bottom_right_case);//x
 
-        const bool front_top_changed = _transversal_change(top_left_case, top_right_case, true); //y
-        const bool front_bottom_changed = _transversal_change(bottom_left_case, bottom_right_case, true); //y
+        const bool front_top_changed = MeshEdgeUtils::transversal_change(top_left_case, top_right_case, true); //y
+        const bool front_bottom_changed = MeshEdgeUtils::transversal_change(bottom_left_case, bottom_right_case, true); //y
 
-        const bool front_left_changed = _transversal_change(top_left_case, bottom_left_case, true); //z
-        const bool front_right_changed = _transversal_change(top_right_case, bottom_right_case, true); //z
+        const bool front_left_changed = MeshEdgeUtils::transversal_change(top_left_case, bottom_left_case, true); //z
+        const bool front_right_changed = MeshEdgeUtils::transversal_change(top_right_case, bottom_right_case, true); //z
 
-        const bool rear_top_changed = _transversal_change(top_left_case, top_right_case, false); //y
-        const bool rear_bottom_changed = _transversal_change(bottom_left_case, bottom_right_case, false); //y
+        const bool rear_top_changed = MeshEdgeUtils::transversal_change(top_left_case, top_right_case, false); //y
+        const bool rear_bottom_changed = MeshEdgeUtils::transversal_change(bottom_left_case, bottom_right_case, false); //y
 
-        const bool rear_left_changed = _transversal_change(top_left_case, bottom_left_case, false); //z
-        const bool rear_right_changed = _transversal_change(top_right_case, bottom_right_case, false); //z
+        const bool rear_left_changed = MeshEdgeUtils::transversal_change(top_left_case, bottom_left_case, false); //z
+        const bool rear_right_changed = MeshEdgeUtils::transversal_change(top_right_case, bottom_right_case, false); //z
 
         const uint32_t rear_top_edge_counter = front_top_edge_counter - front_top_changed;
         const uint32_t rear_bottom_edge_counter = front_bottom_edge_counter - front_bottom_changed;
@@ -581,6 +560,10 @@ void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,
 
             const Vector3 &local_position = edge.local_positions[edge_index];
             const Vector3 position = (ChunkMath::vertices_to_world(chunk_id, local_position) - mid_cell) * inv_cell_size;
+
+            if(position.length() > 0.9f){
+                print_line("out of bound");
+            }
 
             _accumulate_qef(edge.normals[edge_index], position, A, b);
             mass_point += position;
@@ -606,42 +589,42 @@ void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,
 
         if(num_vertices > 0){
 
-            // Tikhonov regularization in normalized space (dimensionless).
-            const float a = alpha;
+            // // Tikhonov regularization in normalized space (dimensionless).
+            // const float a = alpha;
             
 
-            // QEF solve kept for later re-enable.
-            A[0][0] +=a;
-            A[1][1] +=a;
-            A[2][2] +=a;
+            // // QEF solve kept for later re-enable.
+            // A[0][0] +=a;
+            // A[1][1] +=a;
+            // A[2][2] +=a;
 
             mass_point/=num_vertices;
 
-            b+= a*mass_point;
+            // b+= a*mass_point;
 
-            //const float det = A.determinant();
-            // if (std::abs(det) < 1.0f) {
-            //     print_line(vformat("bad determinant in fourth_pass at cell (%d, %d), x=%d: det=%f, num_vertices=%d",
-            //         p_y_cell,
-            //         p_z_cell,
-            //         x,
-            //         det,
-            //         num_vertices));
-            // }
+            // //const float det = A.determinant();
+            // // if (std::abs(det) < 1.0f) {
+            // //     print_line(vformat("bad determinant in fourth_pass at cell (%d, %d), x=%d: det=%f, num_vertices=%d",
+            // //         p_y_cell,
+            // //         p_z_cell,
+            // //         x,
+            // //         det,
+            // //         num_vertices));
+            // // }
 
-            Vector3 qef_solution;
-            const bool solved = solve_linear_system_3x3(A, b, qef_solution);
-            const Vector3 final_vertex_world = ((solved ? qef_solution : mass_point) * cell_size) + mid_cell;
-            Vector3 final_vertex = ChunkMath::world_to_vertices(chunk_id,final_vertex_world);
+            // Vector3 qef_solution;
+            // const bool solved = solve_linear_system_3x3(A, b, qef_solution);
+            // const Vector3 final_vertex_world = ((solved ? qef_solution : mass_point) * cell_size) + mid_cell;
+            // Vector3 final_vertex = ChunkMath::world_to_vertices(chunk_id,final_vertex_world);
             
 
-            const float margin = 0.1f;
+            // const float margin = 0.1f;
 
-            Vector3 min_bound = Vector3(x+margin, p_y_cell+margin, p_z_cell+margin);
-            Vector3 max_bound = min_bound + Vector3(1.0f-margin, 1.0f-margin, 1.0f-margin);
-            final_vertex = final_vertex.clamp(min_bound, max_bound);
+            // Vector3 min_bound = Vector3(x+margin, p_y_cell+margin, p_z_cell+margin);
+            // Vector3 max_bound = min_bound + Vector3(1.0f-margin, 1.0f-margin, 1.0f-margin);
+            // final_vertex = final_vertex.clamp(min_bound, max_bound);
 
-            //const Vector3 final_vertex = mass_point;
+            const Vector3 final_vertex = ChunkMath::world_to_vertices(chunk_id,mass_point*cell_size+mid_cell);
 
             vertices_data.points[vertices_counter]= final_vertex;
 
@@ -666,6 +649,34 @@ void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,
 
 }
 
+bool MeshBufferClass::_cell_has_point(int32_t x, int32_t y, int32_t z) {
+        const uint32_t top_left_case = vertices_data.x_edge_cases(x, y, z);
+        const uint32_t top_right_case = vertices_data.x_edge_cases(x, y + 1, z);
+        const uint32_t bottom_left_case = vertices_data.x_edge_cases(x, y, z + 1);
+        const uint32_t bottom_right_case = vertices_data.x_edge_cases(x, y + 1, z + 1);
+
+        const bool top_left_changed = MeshEdgeUtils::edge_change(top_left_case);
+        const bool top_right_changed = MeshEdgeUtils::edge_change(top_right_case);
+        const bool bottom_left_changed = MeshEdgeUtils::edge_change(bottom_left_case);
+        const bool bottom_right_changed = MeshEdgeUtils::edge_change(bottom_right_case);
+
+        const bool front_top_changed = MeshEdgeUtils::transversal_change(top_left_case, top_right_case, true);
+        const bool front_bottom_changed = MeshEdgeUtils::transversal_change(bottom_left_case, bottom_right_case, true);
+
+        const bool front_left_changed = MeshEdgeUtils::transversal_change(top_left_case, bottom_left_case, true);
+        const bool front_right_changed = MeshEdgeUtils::transversal_change(top_right_case, bottom_right_case, true);
+
+        const bool rear_top_changed = MeshEdgeUtils::transversal_change(top_left_case, top_right_case, false);
+        const bool rear_bottom_changed = MeshEdgeUtils::transversal_change(bottom_left_case, bottom_right_case, false);
+
+        const bool rear_left_changed = MeshEdgeUtils::transversal_change(top_left_case, bottom_left_case, false);
+        const bool rear_right_changed = MeshEdgeUtils::transversal_change(top_right_case, bottom_right_case, false);
+
+        return top_left_changed || top_right_changed || bottom_left_changed || bottom_right_changed ||
+            front_top_changed || front_bottom_changed || front_left_changed || front_right_changed ||
+            rear_top_changed || rear_bottom_changed || rear_left_changed || rear_right_changed;
+};
+
 void MeshBufferClass::fifth_pass(const int32_t p_y_qcell, const int32_t p_z_qcell) {
 
     // Need to check all code, been partialy generated by Gemini 3 pro
@@ -684,6 +695,9 @@ void MeshBufferClass::fifth_pass(const int32_t p_y_qcell, const int32_t p_z_qcel
     uint32_t y_edge_counter = vertices_data.metadata.cum(y + 1, z + 1).y_edge - 1;
     uint32_t z_edge_counter = vertices_data.metadata.cum(y + 1, z + 1).z_edge - 1;
 
+    uint32_t y_far_edge_counter = vertices_data.metadata.cum(y, z + 1).y_edge - 1;
+    uint32_t z_far_edge_counter = vertices_data.metadata.cum(y + 1, z).z_edge - 1;
+
     // Memory buffer indexing for the previous iteration
     uint32_t prev_x_idx_00 = 0, prev_x_idx_10 = 0, prev_x_idx_01 = 0, prev_x_idx_11 = 0;
 
@@ -694,6 +708,16 @@ void MeshBufferClass::fifth_pass(const int32_t p_y_qcell, const int32_t p_z_qcel
 
     auto& vertices = vertices_data.vertices;
 
+    auto write_quad = [&](uint32_t write_idx, bool positive, uint32_t idA, uint32_t idB, uint32_t idC, uint32_t idD) {
+        if (positive) {
+            vertices[write_idx + 0] = idA; vertices[write_idx + 1] = idB; vertices[write_idx + 2] = idC;
+            vertices[write_idx + 3] = idA; vertices[write_idx + 4] = idC; vertices[write_idx + 5] = idD;
+        } else {
+            vertices[write_idx + 0] = idA; vertices[write_idx + 1] = idD; vertices[write_idx + 2] = idC;
+            vertices[write_idx + 3] = idA; vertices[write_idx + 4] = idC; vertices[write_idx + 5] = idB;
+        }
+    };
+
     // Helper lambda to determine if a specific cell contains a point
     auto _cell_has_vertex = [&](int32_t cx, int32_t cy, int32_t cz) -> bool {
         const uint32_t tl = vertices_data.x_edge_cases(cx, cy, cz);
@@ -701,11 +725,11 @@ void MeshBufferClass::fifth_pass(const int32_t p_y_qcell, const int32_t p_z_qcel
         const uint32_t bl = vertices_data.x_edge_cases(cx, cy, cz + 1);
         const uint32_t br = vertices_data.x_edge_cases(cx, cy + 1, cz + 1);
 
-        if (_edge_change(tl) || _edge_change(tr) || _edge_change(bl) || _edge_change(br)) return true;
-        if (_transversal_change(tl, tr, true) || _transversal_change(bl, br, true)) return true;
-        if (_transversal_change(tl, bl, true) || _transversal_change(tr, br, true)) return true;
-        if (_transversal_change(tl, tr, false) || _transversal_change(bl, br, false)) return true;
-        if (_transversal_change(tl, bl, false) || _transversal_change(tr, br, false)) return true;
+        if (MeshEdgeUtils::edge_change(tl) || MeshEdgeUtils::edge_change(tr) || MeshEdgeUtils::edge_change(bl) || MeshEdgeUtils::edge_change(br)) return true;
+        if (MeshEdgeUtils::transversal_change(tl, tr, true) || MeshEdgeUtils::transversal_change(bl, br, true)) return true;
+        if (MeshEdgeUtils::transversal_change(tl, bl, true) || MeshEdgeUtils::transversal_change(tr, br, true)) return true;
+        if (MeshEdgeUtils::transversal_change(tl, tr, false) || MeshEdgeUtils::transversal_change(bl, br, false)) return true;
+        if (MeshEdgeUtils::transversal_change(tl, bl, false) || MeshEdgeUtils::transversal_change(tr, br, false)) return true;
         
         return false;
     };
@@ -729,35 +753,29 @@ void MeshBufferClass::fifth_pass(const int32_t p_y_qcell, const int32_t p_z_qcel
         if (v01) pt_01--;
         if (v11) pt_11--;
 
-        uint32_t case_x = vertices_data.x_edge_cases(x, y + 1, z + 1);
-        bool x_changed = _edge_change(case_x);
-
-        if (x_changed) {
-            bool positive = (case_x == 1);
-            
-            // X-edge Quad indices (using the IDs of the 4 surrounding cells on the YZ plane)
-            uint32_t idA = cur_idx_00;
-            uint32_t idB = cur_idx_10;
-            uint32_t idC = cur_idx_11;
-            uint32_t idD = cur_idx_01;
-
-            uint32_t write_idx = x_edge_counter * 6;
-            
-            // Write IDs to the index buffer (with proper winding order)
-            if (positive) {
-                vertices[write_idx + 0] = idA; vertices[write_idx + 1] = idB; vertices[write_idx + 2] = idC;
-                vertices[write_idx + 3] = idA; vertices[write_idx + 4] = idC; vertices[write_idx + 5] = idD;
-            } else {
-                vertices[write_idx + 0] = idA; vertices[write_idx + 1] = idD; vertices[write_idx + 2] = idC;
-                vertices[write_idx + 3] = idA; vertices[write_idx + 4] = idC; vertices[write_idx + 5] = idB;
-            }
-            x_edge_counter--;
-        }
-
         // Generate Y & Z Edge Quads mapping cells behind it
         if (x > 0) {
+
+            uint32_t case_x = vertices_data.x_edge_cases(x, y + 1, z + 1);
+            bool x_changed = MeshEdgeUtils::edge_change(case_x);
+
+            if (x_changed) {
+                bool positive = (case_x == 1);
+                
+                // X-edge Quad indices (using the IDs of the 4 surrounding cells on the YZ plane)
+                uint32_t idA = cur_idx_00;
+                uint32_t idB = cur_idx_10;
+                uint32_t idC = cur_idx_11;
+                uint32_t idD = cur_idx_01;
+
+                uint32_t write_idx = x_edge_counter * 6;
+
+                write_quad(write_idx, positive, idA, idB, idC, idD);
+                x_edge_counter--;
+            }
+
             uint32_t case_y = vertices_data.x_edge_cases(x, y + 2, z + 1);
-            bool y_changed = _transversal_change(case_x, case_y, true);
+            bool y_changed = MeshEdgeUtils::transversal_change(case_x, case_y, true);
 
             if (y_changed) {
                 // Y-edge Quad indices (spans across the X axis, so we mix prev_x and cur_x)
@@ -766,21 +784,34 @@ void MeshBufferClass::fifth_pass(const int32_t p_y_qcell, const int32_t p_z_qcel
                 uint32_t idC = cur_idx_11;
                 uint32_t idD = prev_x_idx_11;
 
-                bool positive = (_transversal_combination(case_x, case_y, true) == 1);
+                bool positive = (MeshEdgeUtils::transversal_combination(case_x, case_y, true) == 1);
                 uint32_t write_idx = (y_offset + y_edge_counter) * 6;
 
-                if (positive) {
-                    vertices[write_idx + 0] = idA; vertices[write_idx + 1] = idD; vertices[write_idx + 2] = idC;
-                    vertices[write_idx + 3] = idA; vertices[write_idx + 4] = idC; vertices[write_idx + 5] = idB;
-                } else {
-                    vertices[write_idx + 0] = idA; vertices[write_idx + 1] = idB; vertices[write_idx + 2] = idC;
-                    vertices[write_idx + 3] = idA; vertices[write_idx + 4] = idC; vertices[write_idx + 5] = idD;
-                }
+                // Keep the previous Y-edge winding convention.
+                write_quad(write_idx, !positive, idA, idB, idC, idD);
                 y_edge_counter--;
             }
 
+            // if(y==0){
+            //     uint32_t case_y_far = vertices_data.x_edge_cases(x, y , z + 1);
+            //     bool y_far_changed = MeshEdgeUtils::transversal_change(case_y_far,case_x, true);
+            //     if(y_far_changed){
+
+            //     uint32_t idA = prev_x_idx_00;
+            //     uint32_t idB = cur_idx_00;
+            //     uint32_t idC = cur_idx_01;
+            //     uint32_t idD = prev_x_idx_01;
+            //     bool positive = (MeshEdgeUtils::transversal_combination(case_y_far,case_x, true) == 1);
+            //     uint32_t write_idx = (y_offset + y_far_edge_counter) * 6;
+
+            //     // Keep the previous Y-edge winding convention.
+            //     write_quad(write_idx, !positive, idA, idB, idC, idD);
+            //     y_far_edge_counter--;
+            //     }
+            // }
+
             uint32_t case_z = vertices_data.x_edge_cases(x, y + 1, z + 2);
-            bool z_changed = _transversal_change(case_x, case_z, true);
+            bool z_changed = MeshEdgeUtils::transversal_change(case_x, case_z, true);
 
             if (z_changed) {
                 // Z-edge Quad indices
@@ -789,18 +820,30 @@ void MeshBufferClass::fifth_pass(const int32_t p_y_qcell, const int32_t p_z_qcel
                 uint32_t idC = cur_idx_11;
                 uint32_t idD = prev_x_idx_11;
 
-                bool positive = (_transversal_combination(case_x, case_z, true) == 1);
+                bool positive = (MeshEdgeUtils::transversal_combination(case_x, case_z, true) == 1);
                 uint32_t write_idx = (z_offset + z_edge_counter) * 6;
 
-                if (positive) {
-                    vertices[write_idx + 0] = idA; vertices[write_idx + 1] = idB; vertices[write_idx + 2] = idC;
-                    vertices[write_idx + 3] = idA; vertices[write_idx + 4] = idC; vertices[write_idx + 5] = idD;
-                } else {
-                    vertices[write_idx + 0] = idA; vertices[write_idx + 1] = idD; vertices[write_idx + 2] = idC;
-                    vertices[write_idx + 3] = idA; vertices[write_idx + 4] = idC; vertices[write_idx + 5] = idB;
-                }
+                write_quad(write_idx, positive, idA, idB, idC, idD);
                 z_edge_counter--;
             }
+
+            // if(z==0){
+            //     uint32_t case_z_far = vertices_data.x_edge_cases(x, y +1 , z);
+            //     bool z_far_changed = MeshEdgeUtils::transversal_change(case_z_far,case_x, true);
+            //     if(z_far_changed){
+
+            //     uint32_t idA = prev_x_idx_00;
+            //     uint32_t idB = cur_idx_00;
+            //     uint32_t idC = cur_idx_10;
+            //     uint32_t idD = prev_x_idx_10;
+            //     bool positive = (MeshEdgeUtils::transversal_combination(case_z_far,case_x, true) == 1);
+            //     uint32_t write_idx = (z_offset + z_far_edge_counter) * 6;
+
+            //     // Keep the previous Y-edge winding convention.
+            //     write_quad(write_idx, positive, idA, idB, idC, idD);
+            //     z_far_edge_counter--;
+            //     }
+            // }
         }
 
         // Push current points indices to previous for next iteration step
@@ -808,6 +851,85 @@ void MeshBufferClass::fifth_pass(const int32_t p_y_qcell, const int32_t p_z_qcel
         prev_x_idx_10 = cur_idx_10;
         prev_x_idx_01 = cur_idx_01;
         prev_x_idx_11 = cur_idx_11;
+    }
+}
+
+void MeshBufferClass::cache_edge() {
+    vertices_data.edge_cache.clear();
+
+    if (vertices_data.points.empty()) {
+        return;
+    }
+
+
+
+    const int32_t x_max = vertices_data.width - 1;
+    const int32_t y_max = vertices_data.height - 2;
+    const int32_t z_max = vertices_data.depth - 2;
+
+
+    for (int32_t z = 0; z < vertices_data.depth - 1; ++z) {
+        for (int32_t y = 0; y < vertices_data.height - 1; ++y) {
+
+            const int row_points = vertices_data.metadata(y,z).counts.point;
+
+            if(row_points==0){continue;}
+
+            const bool yz_boundary = (y == 0 || y == y_max || z == 0 || z == z_max);
+
+            const int32_t x_start = MIN(
+                vertices_data.metadata(y, z).start_trim,
+                MIN(vertices_data.metadata(y + 1, z).start_trim,
+                    MIN(vertices_data.metadata(y, z + 1).start_trim,
+                        vertices_data.metadata(y + 1, z + 1).start_trim))
+            );
+
+            const int32_t x_end = MAX(
+                vertices_data.metadata(y, z).end_trim,
+                MAX(vertices_data.metadata(y + 1, z).end_trim,
+                    MAX(vertices_data.metadata(y, z + 1).end_trim,
+                        vertices_data.metadata(y + 1, z + 1).end_trim))
+            );
+
+            // For interior YZ rows, only X-face boundary cells may be cached.
+            if (!yz_boundary && x_start > 0 && x_end <= x_max) {
+                continue;
+            }
+
+            uint32_t point_index = vertices_data.metadata.cum(y, z).point - 1;
+            // Fast path: interior YZ rows only need x=0 and x=x_max checks.
+            if (!yz_boundary) {
+
+
+                const bool has_x0_in_trim = (x_start <= 0 && 0 < x_end);
+                if (has_x0_in_trim && _cell_has_point(0, y, z)) {
+                    vertices_data.edge_cache.insert(Vector3i(0, y, z), &vertices_data.points[point_index]);
+                }
+
+                const bool has_xmax_in_trim = (x_start <= x_max && x_max < x_end);
+                if (has_xmax_in_trim && _cell_has_point(x_max, y, z)) {
+                    vertices_data.edge_cache.insert(Vector3i(x_max, y, z), &vertices_data.points[point_index-(row_points-1)]);
+                }
+
+                continue;
+            }
+
+            
+            for (int32_t x = x_start; x < x_end; ++x) {
+                if (!_cell_has_point(x, y, z)) {
+                    continue;
+                }
+
+                const bool is_boundary_cell = yz_boundary || x == 0 || x == x_max;
+                if (!is_boundary_cell) {
+                    point_index--;
+                    continue;
+                }
+
+                vertices_data.edge_cache.insert(Vector3i(x, y, z), &vertices_data.points[point_index]);
+                point_index--;
+            }
+        }
     }
 }
 
@@ -858,6 +980,8 @@ void MeshBufferClass::execute_on_self(){
         }
     }
 
+    cache_edge(); // for inter-chunk patching
+
 
     // const Vector3 zero_point = Vector3(0.0f, 0.0f, 0.0f);
 
@@ -896,3 +1020,6 @@ void MeshBufferClass::execute_on_self(){
     // }
 
 }
+
+
+

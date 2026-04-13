@@ -67,6 +67,10 @@ void ChunkClass::initialize(const Vector3i &p_chunk_pos, SDFBase *p_sdf) {
     state = ChunkState::OUTER_MESH;
 }
 
+void ChunkClass::rebuild_mesh() {
+    _build_chunk_mesh();
+}
+
 void ChunkClass::_build_chunk_mesh() {
     if (mesh_instance == nullptr) {
         mesh_instance = memnew(MeshInstance3D);
@@ -75,8 +79,10 @@ void ChunkClass::_build_chunk_mesh() {
 
     const auto &points = mesh_info.vertices_data.points;
     const auto &raw_indices = mesh_info.vertices_data.vertices;
+    const auto &outer_points = mesh_info.vertices_data.outer_point;
+    const auto &outer_raw_indices = mesh_info.vertices_data.outer_vertices;
 
-    if (points.empty() || raw_indices.empty()) {
+    if ((points.empty() || raw_indices.empty()) && (outer_points.is_empty() || outer_raw_indices.is_empty())) {
         mesh_instance->set_mesh(Ref<ArrayMesh>());
         return;
     }
@@ -84,10 +90,19 @@ void ChunkClass::_build_chunk_mesh() {
     const Vector3 chunk_origin = ChunkMath::chunk_to_world(chunk_pos);
 
     PackedVector3Array vertices;
-    vertices.resize(static_cast<int>(points.size()));
+    const int base_vertex_count = static_cast<int>(points.size());
+    const int outer_vertex_count = outer_points.size();
+    vertices.resize(base_vertex_count + outer_vertex_count);
+
     for (size_t i = 0; i < points.size(); ++i) {
         const Vector3 world_pos = ChunkMath::vertices_to_world(chunk_pos, points[i]);
         vertices.set(static_cast<int>(i), world_pos - chunk_origin);
+    }
+
+    for (int i = 0; i < outer_vertex_count; ++i) {
+        // outer_point is already in world space from chunk patching.
+        const Vector3 world_pos = outer_points[i];
+        vertices.set(base_vertex_count + i, world_pos - chunk_origin);
     }
 
     PackedVector3Array normals;
@@ -107,6 +122,42 @@ void ChunkClass::_build_chunk_mesh() {
         if (a < 0 || b < 0 || c < 0 || a >= vertices.size() || b >= vertices.size() || c >= vertices.size()) {
             continue;
         }
+        if (a == b || b == c || c == a) {
+            continue;
+        }
+
+        const Vector3 va = vertices[a];
+        const Vector3 vb = vertices[b];
+        const Vector3 vc = vertices[c];
+        const Vector3 face_normal = (vb - va).cross(vc - va);
+
+        if (face_normal.length_squared() <= min_area_sq) {
+            continue;
+        }
+
+        normals.set(a, normals[a] + face_normal);
+        normals.set(b, normals[b] + face_normal);
+        normals.set(c, normals[c] + face_normal);
+
+        indices.push_back(a);
+        indices.push_back(b);
+        indices.push_back(c);
+    }
+
+    // Add patch triangles, offset by base vertex count.
+    for (int i = 0; i + 2 < outer_raw_indices.size(); i += 3) {
+        const int oa = static_cast<int>(outer_raw_indices[i]);
+        const int ob = static_cast<int>(outer_raw_indices[i + 1]);
+        const int oc = static_cast<int>(outer_raw_indices[i + 2]);
+
+        if (oa < 0 || ob < 0 || oc < 0 || oa >= outer_vertex_count || ob >= outer_vertex_count || oc >= outer_vertex_count) {
+            continue;
+        }
+
+        const int a = base_vertex_count + oa;
+        const int b = base_vertex_count + ob;
+        const int c = base_vertex_count + oc;
+
         if (a == b || b == c || c == a) {
             continue;
         }

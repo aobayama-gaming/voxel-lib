@@ -12,7 +12,7 @@ namespace {
 bool _chunk_is_outside_sdf(const SDFBase &sdf, const Vector3i &chunk_pos) {
     const float chunk_size = ChunkMath::world_chunk_size(chunk_pos);
     const float half_size = chunk_size * 0.25f;
-    const float chunk_outer_radius = chunk_size * 0.8660254f;
+    const float chunk_outer_radius = chunk_size ; //0.8660254f
     const Vector3 chunk_center = ChunkMath::chunk_to_world(chunk_pos);
 
     for (int corner = 0; corner < 8; ++corner) {
@@ -98,7 +98,7 @@ void VoxelEngineClass::_ready() {
         //     value *= phi;
         // }
         // Configuration
-        const int lod_levels = 15;
+        const int lod_levels = 4;
 
         // LOD thresholds are stored in chunk-coordinate units because the scan
         // logic compares them against chunk-space distances.
@@ -321,7 +321,28 @@ void VoxelEngineClass::load_chunks() {
         chunks_to_load_by_lod[lod].clear();
     }
 
-    print_line(vformat("Loaded chunks: %d", loaded_chunks.size()));
+    // // Patch all currently loaded chunks, then rebuild their mesh with outer patch data.
+    // for (const Vector3i &chunk_pos : loaded_chunks) {
+    //     ChunkClass **chunk_ptr = chunks.getptr(chunk_pos);
+    //     if (!chunk_ptr || !*chunk_ptr) {
+    //         continue;
+    //     }
+
+    //     chunk_patching(**chunk_ptr);
+    // }
+
+    // for (const Vector3i &chunk_pos : loaded_chunks) {
+    //     ChunkClass **chunk_ptr = chunks.getptr(chunk_pos);
+    //     if (!chunk_ptr || !*chunk_ptr) {
+    //         continue;
+    //     }
+
+    //     (*chunk_ptr)->rebuild_mesh();
+    // }
+
+    // print_line(vformat("Loaded chunks: %d", loaded_chunks.size()));
+
+    //Debug dummy patching 
 }
 
 void VoxelEngineClass::run_chunk_pipeline() {
@@ -333,58 +354,239 @@ void VoxelEngineClass::run_chunk_pipeline() {
 
 void VoxelEngineClass::chunk_patching(ChunkClass &chunk){
     /*
-    Chunk patching is quite simple actually check the six neighbor around the chunk.
-    For inferior chunk if the neighbor is bigger or same size and Ready (at least Inner_Mesh) generate patch.
-    for superior chunk if the neighbor is bigger and ready generate patch.
+    Chunk patching evaluates external edges of the chunk. 
+    If the edge is changed, we grab the 4 surrounding dual points (from the chunk and its neighbors).
+    - If any neighbor has a larger LOD, we patch toward them to seal the gap.
+    - If the neighbors are equal LOD, we only patch on the positive faces to prevent duplicating quads.
+    - An outer_point_cache maps world coordinates to indices to reuse dual points cleanly.
     */
+    
+    HashMap<Vector3, uint32_t> outer_point_cache;
+    std::vector<uint32_t> patch_indices;
+    std::vector<Vector3> patch_vertices; 
 
-    const Vector3i chunk_id = chunk.chunk_pos ;
-    const MeshBufferClass &mesh_info = chunk.mesh_info;
 
-    const int32_t lod = ChunkMath::get_lod(chunk_id);
-    const int32_t chunk_size = (1 >> lod)*2;
 
-    /*
-    Need to do two variation of the algorithm for front and backs faces and around faces (due to x_edge).　
-    Need to have two variations of the algorithm chunk arrete.
-    Need to have a first pass for memory allocation of the extra point/vertices dependant on the lod of the neighbor.
-    the inner position should be taken from the classical indices, the duplicate point borrowed from other lod should get a new indices +max
-    For each face there is only one quad in the case that LOD are the same. 
-    */
+    const Vector3i chunk_id = chunk.chunk_pos;
+    const int32_t current_lod = ChunkMath::get_lod(chunk_id);
+    auto& vertices_data = chunk.mesh_info.vertices_data;
 
-    // case 1 : x_edge edges
+    auto get_idx = [&](Vector3i vertices_cord) -> int {
+        const int& x = vertices_cord.x;
+        const int& y = vertices_cord.y;
+        const int& z = vertices_cord.z;
 
-    const Vector3i top_neighbor_pos = chunk_id - Vector3i(0,chunk_size,0);
-    const Vector3i top_left_neighbor_pos = chunk_id - Vector3i(0,chunk_size,chunk_size);
-    const Vector3i left_neighbor_pos = chunk_id - Vector3i(0,0,chunk_size);
+        Vector3* point;
 
-    ChunkClass* top_neighbor;
-    ChunkClass* top_left_neighbor;
-    ChunkClass* left_neighbor;
+        if(x<0||x>vertices_data.width-1 ||y<0||y>vertices_data.height-1 ||z<0||z>vertices_data.depth-1 ){
+            
+            const Vector3 global_vertices_position = ChunkMath::vertices_to_world(chunk.chunk_pos,vertices_cord+Vector3(0.5f,0.5f,0.5f));
 
-    const uint32_t top_neighbor_lod = chunks.get_chunk(top_neighbor_pos,top_neighbor);
-    const uint32_t top_left_neighbor_lod = chunks.get_chunk(top_left_neighbor_pos,top_left_neighbor);
-    const uint32_t left_neighbor_lod = chunks.get_chunk(left_neighbor_pos,left_neighbor);
+            const Vector3i lod0_chunk = ChunkMath::world_to_chunk(global_vertices_position);
+            
+            ChunkClass* neighbor_chunk;
 
-    if(top_neighbor_lod==-1 || top_left_neighbor_lod==-1 || left_neighbor_lod == -1)
-    {
-        return;
+            const int neighbor_lod = chunks.get_chunk(lod0_chunk,neighbor_chunk);
+
+            if(neighbor_lod<ChunkMath::get_lod(chunk.chunk_pos)){
+                return -1;
+            }
+
+            const Vector3 local_neighbor_vertices = ChunkMath::world_to_vertices(neighbor_chunk->chunk_pos,global_vertices_position);
+            const Vector3i local_neighbor_cell = local_neighbor_vertices.floor();
+
+            if(!neighbor_chunk->mesh_info.vertices_data.edge_cache.has(local_neighbor_cell)){
+                return -1;
+            }
+
+            point = neighbor_chunk->mesh_info.vertices_data.edge_cache.get(local_neighbor_cell);
+
+        }
+        else{
+
+            point = chunk.mesh_info.vertices_data.edge_cache.get(vertices_cord);
+
+        }
+
+        if(!outer_point_cache.has(*point)){
+            patch_vertices.push_back(*point);
+            outer_point_cache.insert(*point,patch_vertices.size()-1);
+        }
+
+        return outer_point_cache[*point];
+    };
+
+    // Define the boundaries based on vertices width/height/depth
+    const int32_t x_max = vertices_data.width ;
+    const int32_t y_max = vertices_data.height - 1;
+    const int32_t z_max = vertices_data.depth - 1;
+
+    const int32_t x_min = 0; // we don t care about outer x edge
+    const int32_t y_min = - 1;
+    const int32_t z_min = - 1;
+
+
+    for (int32_t z = z_min; z < z_max; ++z) {
+        for (int32_t y = y_min; y < y_max; ++y) {
+
+            const bool y_boundary = y ==y_min || y==y_max-1;
+            const bool z_boundary = z ==z_min || z==z_max-1;
+
+            for (int32_t x = x_min; x < x_max; x++) {
+
+                // X case
+                if(x<vertices_data.width){
+                    if(y_boundary||z_boundary){
+                        uint32_t case_x = vertices_data.x_edge_cases(x, y + 1, z + 1);
+                        bool x_changed = MeshEdgeUtils::edge_change(case_x);
+                    }
+                }
+
+
+            }
+
+        }
     }
-    if(top_neighbor->state < ChunkState::INNER_MESH || top_left_neighbor->state < ChunkState::INNER_MESH ||left_neighbor->state < ChunkState::INNER_MESH){
-        return;
-    }
 
-    auto& meta = chunk.mesh_info.vertices_data.metadata(0,0);
+    // // Helper: Finds the loaded chunk owning a specific cell and retrieves its cached point
+    // auto get_cell_vertex = [&](Vector3i C, Vector3& out_pos, int& out_lod) -> bool {
+    //     // Find midpoint of cell in world space
+    //     Vector3 mid_world = ChunkMath::vertices_to_world(chunk_id, Vector3(C.x + 0.5f, C.y + 0.5f, C.z + 0.5f));
+    //     Vector3i lod0_pos = ChunkMath::world_to_chunk(mid_world);
 
-    int top_neighbor_x_counter = 0;
-    int top_left_neighbor_x_counter = 0;
-    int left_neighbor_x_counter = 0;
+    //     ChunkClass* owner = nullptr;
+    //     out_lod = chunks.get_chunk(lod0_pos, owner);
+    //     if (out_lod < 0 || owner == nullptr) {
+    //         return false;
+    //     }
+        
+    //     // Convert world position back to local vertices relative to the owner chunk
+    //     Vector3 local_world = ChunkMath::world_to_vertices(owner->chunk_pos, mid_world);
+    //     Vector3i local_C(std::floor(local_world.x), std::floor(local_world.y), std::floor(local_world.z));
+        
+    //     // Fetch from that specific neighbor's precomputed boundary edge cache
+    //     Vector3 **pt = owner->mesh_info.vertices_data.edge_cache.getptr(local_C);
+    //     if (pt && *pt) {
+    //         out_pos = ChunkMath::vertices_to_world(owner->chunk_pos, **pt);
+    //         return true;
+    //     }
+    //     return false;
+    // };
 
-    for(int x=meta.start_trim; x<meta.end_trim;x++){
+    // // Helper: Uses cache to prevent duplicating the newly generated patch points
+    // auto get_or_add_vertex = [&](const Vector3& pos) -> uint32_t {
+    //     if (outer_point_cache.has(pos)) return outer_point_cache[pos];
+    //     uint32_t idx = patch_vertices.size();
+    //     outer_point_cache[pos] = idx;
+    //     patch_vertices.push_back(pos);
+    //     return idx;
+    // };
 
+    // // Edge Processing
+    // auto process_edge = [&](int axis, int x, int y, int z) {
+    //     // Check if this edge is sitting exactly on the positive boundary limits
+    //     bool is_positive_face = false;
+    //     if (axis == 0) is_positive_face = (y == y_max || z == z_max);
+    //     if (axis == 1) is_positive_face = (x == x_max || z == z_max);
+    //     if (axis == 2) is_positive_face = (x == x_max || y == y_max);
 
+    //     // Check for an intersection on this edge
+    //     Vector3 P0 = ChunkMath::vertices_to_world(chunk_id, Vector3(x, y, z));
+    //     Vector3 P1 = P0;
+    //     if (axis == 0) P1 = ChunkMath::vertices_to_world(chunk_id, Vector3(x + 1, y, z));
+    //     else if (axis == 1) P1 = ChunkMath::vertices_to_world(chunk_id, Vector3(x, y + 1, z));
+    //     else if (axis == 2) P1 = ChunkMath::vertices_to_world(chunk_id, Vector3(x, y, z + 1));
 
-    }
+    //     float v0 = sdf->evaluate(P0);
+    //     float v1 = sdf->evaluate(P1);
+    //     if ((v0 < 0.0f) == (v1 < 0.0f)) return; // No change in sign, no boundary intersection here
 
+    //     bool positive = (v0 < 0.0f);
 
+    //     // Get relative coordinates for the 4 surrounding cells
+    //     Vector3i C[4];
+    //     if (axis == 0) {
+    //         C[0] = Vector3i(x, y-1, z-1); C[1] = Vector3i(x, y, z-1);
+    //         C[2] = Vector3i(x, y, z);     C[3] = Vector3i(x, y-1, z);
+    //     } else if (axis == 1) {
+    //         C[0] = Vector3i(x-1, y, z-1); C[1] = Vector3i(x, y, z-1);
+    //         C[2] = Vector3i(x, y, z);     C[3] = Vector3i(x-1, y, z);
+    //     } else {
+    //         C[0] = Vector3i(x-1, y-1, z); C[1] = Vector3i(x, y-1, z);
+    //         C[2] = Vector3i(x, y, z);     C[3] = Vector3i(x-1, y, z);
+    //     }
+
+    //     Vector3 pts[4];
+    //     int max_lod_found = -1;
+        
+    //     // Grab caching points. Quit forming the quad if boundary data limits are missing.
+    //     for(int i = 0; i < 4; ++i) {
+    //         int lod = -1;
+    //         if (!get_cell_vertex(C[i], pts[i], lod)) return;
+    //         if (lod > max_lod_found) max_lod_found = lod;
+    //     }
+
+    //     // Apply rules for quad creation:
+    //     if (max_lod_found < current_lod) return; // Wait to be patched *by* the finer level chunk
+    //     if (max_lod_found == current_lod && !is_positive_face) return; // Let equal LOD positive face chunk handle this
+
+    //     // Quad indices Generation
+    //     uint32_t i0 = get_or_add_vertex(pts[0]);
+    //     uint32_t i1 = get_or_add_vertex(pts[1]);
+    //     uint32_t i2 = get_or_add_vertex(pts[2]);
+    //     uint32_t i3 = get_or_add_vertex(pts[3]);
+
+    //     if (positive) {
+    //         patch_indices.push_back(i0); patch_indices.push_back(i1); patch_indices.push_back(i2);
+    //         patch_indices.push_back(i0); patch_indices.push_back(i2); patch_indices.push_back(i3);
+    //     } else {
+    //         patch_indices.push_back(i0); patch_indices.push_back(i3); patch_indices.push_back(i2);
+    //         patch_indices.push_back(i0); patch_indices.push_back(i2); patch_indices.push_back(i1);
+    //     }
+    // };
+
+    // // 1. X-edge family sweeps X, keeps Y,Z on boundaries.
+    // for (int32_t x = 0; x < x_max; ++x) {
+    //     for (int32_t y = 0; y <= y_max; ++y) {
+    //         for (int32_t z = 0; z <= z_max; ++z) {
+    //             if (y == 0 || y == y_max || z == 0 || z == z_max) {
+    //                 process_edge(0, x, y, z);
+    //             }
+    //         }
+    //     }
+    // }
+
+    // // 2. Y-edge family sweeps Y, keeps X,Z on boundaries.
+    // for (int32_t y = 0; y < y_max; ++y) {
+    //     for (int32_t x = 0; x <= x_max; ++x) {
+    //         for (int32_t z = 0; z <= z_max; ++z) {
+    //             if (x == 0 || x == x_max || z == 0 || z == z_max) {
+    //                 process_edge(1, x, y, z);
+    //             }
+    //         }
+    //     }
+    // }
+
+    // // 3. Z-edge family sweeps Z, keeps X,Y on boundaries.
+    // for (int32_t z = 0; z < z_max; ++z) {
+    //     for (int32_t x = 0; x <= x_max; ++x) {
+    //         for (int32_t y = 0; y <= y_max; ++y) {
+    //             if (x == 0 || x == x_max || y == 0 || y == y_max) {
+    //                 process_edge(2, x, y, z);
+    //             }
+    //         }
+    //     }
+    // }
+    
+    // // Export patch buffers to the chunk mesh side-channel arrays.
+    // vertices_data.outer_point.clear();
+    // vertices_data.outer_vertices.clear();
+
+    // for (const Vector3 &v : patch_vertices) {
+    //     vertices_data.outer_point.push_back(v);
+    // }
+
+    // for (uint32_t idx : patch_indices) {
+    //     vertices_data.outer_vertices.push_back(static_cast<int64_t>(idx));
+    // }
 }

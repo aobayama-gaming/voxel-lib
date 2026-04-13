@@ -76,13 +76,17 @@ public:
         return -1; // Not found
     };
 
-    int get_chunk(const Vector3i &p_chunk_pos,ChunkClass *chunk){
+    int get_chunk(const Vector3i &p_chunk_pos, ChunkClass *&chunk){
         // retrieve the chunk or its parent.
 
+        chunk = nullptr;
+
         int actual_lod = 0;
+
+        Vector3i parent_pos = p_chunk_pos;
         while (actual_lod < max_lod) {
 
-            Vector3i parent_pos = ChunkMath::get_parent_from_child(p_chunk_pos, actual_lod);
+            parent_pos = ChunkMath::get_parent_from_child(parent_pos, actual_lod);
 
             if (has(parent_pos)) {
                 chunk = get(parent_pos);
@@ -92,8 +96,6 @@ public:
         };
 
         return -1; // Not found
-
-
     };
 
 };

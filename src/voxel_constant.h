@@ -6,6 +6,6 @@ namespace VoxelEngineConstants {
     inline constexpr float VOXEL_SIZE = 0.1f; // Each voxel is 10cm in size.
 
     // Chunk dimension in world space
-    inline constexpr float CHUNK_DIMENSION = CHUNK_SIZE * VOXEL_SIZE; // World size of a chunk
+    inline constexpr float CHUNK_DIMENSION = (CHUNK_SIZE-1) * VOXEL_SIZE; // World size of a chunk, Offset by one
     
 }
