@@ -43,7 +43,7 @@ public:
 
         const Vector3 q(
             repeat_axis(p_world_pos.x),
-            repeat_axis(p_world_pos.y),
+            p_world_pos.y,
             repeat_axis(p_world_pos.z)
         );
 

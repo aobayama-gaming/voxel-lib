@@ -4,7 +4,7 @@
 
 #include <cmath>
 
-inline constexpr int BINARY_SEARCH_STEP = 4;
+inline constexpr int BINARY_SEARCH_STEP = 5;
 
 namespace {
 
@@ -136,7 +136,9 @@ void MeshBufferClass::second_pass(const int32_t p_y_cell,const int32_t p_z_cell)
     // in some weird surface this case can happens
     meta.start_trim = MIN(meta.x_start_trim,MIN(vertices_data.metadata(p_y_cell+1, p_z_cell).x_start_trim,vertices_data.metadata(p_y_cell, p_z_cell+1).x_start_trim));
     meta.end_trim = MAX(meta.x_end_trim,MAX(vertices_data.metadata(p_y_cell+1, p_z_cell).x_end_trim,vertices_data.metadata(p_y_cell, p_z_cell+1).x_end_trim));
-
+    
+    //meta.start_trim=0;
+    //meta.end_trim = vertices_data.width;
 
     const bool collapsed_trim = ( meta.end_trim == 0);
     meta.end_trim+=collapsed_trim;
@@ -144,19 +146,35 @@ void MeshBufferClass::second_pass(const int32_t p_y_cell,const int32_t p_z_cell)
     uint32_t end_condition = meta.end_trim;
     uint32_t start_condition = meta.start_trim;
 
+    bool collapsed_trim_z = false;
 
     if (z_max) {
         vertices_data.metadata(p_y_cell, p_z_cell+1).start_trim = MIN(vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_start_trim,vertices_data.metadata(p_y_cell, p_z_cell+1).x_start_trim);
         vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim = MAX(vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_end_trim,vertices_data.metadata(p_y_cell, p_z_cell+1).x_end_trim);
         
+        collapsed_trim_z = vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim==0;
+        vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim+=collapsed_trim_z;
+
+        //vertices_data.metadata(p_y_cell, p_z_cell+1).start_trim = 0 ;
+        //vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim = vertices_data.width;
+
         start_condition = MIN(start_condition,vertices_data.metadata(p_y_cell, p_z_cell+1).start_trim);
         end_condition = MAX(end_condition,vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim);
 
     }
 
+    bool collapsed_trim_y = false;
+
     if (y_max) {
         vertices_data.metadata(p_y_cell+1, p_z_cell).start_trim = MIN(vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_start_trim,vertices_data.metadata(p_y_cell+1, p_z_cell).x_start_trim);
         vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim = MAX(vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_end_trim,vertices_data.metadata(p_y_cell+1, p_z_cell).x_end_trim);
+
+
+        collapsed_trim_y = vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim==0;
+        vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim+=collapsed_trim_y;
+        
+        //vertices_data.metadata(p_y_cell+1, p_z_cell).start_trim = 0 ;
+        //vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim = vertices_data.width;
 
         start_condition = MIN(start_condition,vertices_data.metadata(p_y_cell+1, p_z_cell).start_trim);
         end_condition = MAX(end_condition,vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim);
@@ -168,6 +186,9 @@ void MeshBufferClass::second_pass(const int32_t p_y_cell,const int32_t p_z_cell)
     if(y_max && z_max){
         vertices_data.metadata(p_y_cell+1, p_z_cell+1).start_trim =vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_start_trim;
         vertices_data.metadata(p_y_cell+1, p_z_cell+1).end_trim =vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_end_trim;
+
+        //vertices_data.metadata(p_y_cell+1, p_z_cell+1).start_trim = 0 ;
+        //vertices_data.metadata(p_y_cell+1, p_z_cell+1).end_trim = vertices_data.width;
     }
 
     for( int32_t x=start_condition ; x<end_condition ; x++){
@@ -270,14 +291,19 @@ void MeshBufferClass::second_pass(const int32_t p_y_cell,const int32_t p_z_cell)
             end_condition = vertices_data.width;
         }
 
-            
-            
-        
 
     }
 
     if( collapsed_trim && meta.end_trim ==1 ){
         meta.end_trim=0;
+    }
+
+    if( collapsed_trim_z && vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim ==1 ){
+        vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim=0;
+    }
+
+    if( collapsed_trim_y && vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim ==1 ){
+        vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim=0;
     }
 }
 
@@ -640,11 +666,11 @@ void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,
             Vector3 final_vertex = ChunkMath::world_to_vertices(chunk_id,final_vertex_world);
             
 
-            // const float margin = 0.1f;
+            const float margin = 0.1f;
 
-            // Vector3 min_bound = Vector3(x+margin, p_y_cell+margin, p_z_cell+margin);
-            // Vector3 max_bound = min_bound + Vector3(1.0f-margin, 1.0f-margin, 1.0f-margin);
-            //final_vertex = final_vertex.clamp(min_bound, max_bound);
+            Vector3 min_bound = Vector3(x+margin, p_y_cell+margin, p_z_cell+margin);
+            Vector3 max_bound = min_bound + Vector3(1.0f-margin, 1.0f-margin, 1.0f-margin);
+            final_vertex = final_vertex.clamp(min_bound, max_bound);
 
             //const Vector3 final_vertex = ChunkMath::world_to_vertices(chunk_id,mass_point*cell_size+mid_cell);
 

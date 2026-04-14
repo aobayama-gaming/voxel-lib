@@ -63,6 +63,7 @@ void ChunkClass::initialize(const Vector3i &p_chunk_pos, SDFBase *p_sdf) {
     mesh_info.initialize(chunk_pos, sdf);
     mesh_info.execute_on_self();
     _build_chunk_mesh();
+    _build_debug_mesh_point();
 
     state = ChunkState::OUTER_MESH;
 }
@@ -89,118 +90,124 @@ void ChunkClass::_build_chunk_mesh() {
 
     const Vector3 chunk_origin = ChunkMath::chunk_to_world(chunk_pos);
 
-    PackedVector3Array vertices;
+    // 1. Gather all shared positions first (in local chunk space)
+    PackedVector3Array shared_positions;
     const int base_vertex_count = static_cast<int>(points.size());
     const int outer_vertex_count = outer_points.size();
-    vertices.resize(base_vertex_count + outer_vertex_count);
+    shared_positions.resize(base_vertex_count + outer_vertex_count);
 
     for (size_t i = 0; i < points.size(); ++i) {
         const Vector3 world_pos = ChunkMath::vertices_to_world(chunk_pos, points[i]);
-        vertices.set(static_cast<int>(i), world_pos - chunk_origin);
+        shared_positions.set(static_cast<int>(i), world_pos - chunk_origin);
     }
 
     for (int i = 0; i < outer_vertex_count; ++i) {
-        // outer_point is already in world space from chunk patching.
         const Vector3 world_pos = outer_points[i];
-        vertices.set(base_vertex_count + i, world_pos - chunk_origin);
+        shared_positions.set(base_vertex_count + i, world_pos - chunk_origin);
     }
 
-    PackedVector3Array normals;
-    normals.resize(vertices.size());
-    for (int i = 0; i < normals.size(); ++i) {
-        normals.set(i, Vector3());
-    }
-
-    PackedInt32Array indices;
+    // 2. Prepare flat arrays (Maximum possible size = number of raw indices)
+    const size_t max_indices = raw_indices.size() + outer_raw_indices.size();
+    PackedVector3Array final_vertices;
+    PackedVector3Array final_normals;
+    PackedInt32Array final_indices;
+    
+    final_vertices.resize(max_indices);
+    final_normals.resize(max_indices);
+    final_indices.resize(max_indices);
+    
+    int current_vertex_idx = 0;
     constexpr float min_area_sq = 1e-12f;
+    const float normal_inset = 0.1f; // 5% inset toward triangle midpoint
 
+    // Lambda to process a single triangle, duplicate points, and calculate inset normals
+    auto process_triangle = [&](int idx_a, int idx_b, int idx_c) {
+        // if (idx_a < 0 || idx_b < 0 || idx_c < 0 || 
+        //     idx_a >= shared_positions.size() || idx_b >= shared_positions.size() || idx_c >= shared_positions.size()) {
+        //     return;
+        // }
+        // if (idx_a == idx_b || idx_b == idx_c || idx_c == idx_a) {
+        //     return;
+        // }
+
+        const Vector3 va = shared_positions[idx_a];
+        const Vector3 vb = shared_positions[idx_b];
+        const Vector3 vc = shared_positions[idx_c];
+        
+        // Calculate raw geometric face normal
+        const Vector3 face_normal_cross = (vb - va).cross(vc - va);
+        // if (face_normal_cross.length_squared() <= min_area_sq) {
+        //     return; // Degenerate triangle
+        // }
+        const Vector3 geometric_normal = face_normal_cross.normalized();
+
+        // Calculate triangle midpoint (centroid) in local space
+        const Vector3 centroid = (va + vb + vc) / 3.0f;
+
+        const Vector3 tri_verts[3] = {va, vb, vc};
+
+        // Output 3 brand new, distinct vertices for this triangle
+        for (int j = 0; j < 3; ++j) {
+            const Vector3 v = tri_verts[j];
+            Vector3 n;
+
+            if (sdf != nullptr) {
+                // Lerp 5% toward the centroid, then shift to world space to evaluate SDF
+                const Vector3 sample_point = v.lerp(centroid, normal_inset) + chunk_origin;
+                n = -sdf->evaluate_normal(sample_point);
+                
+                const float len = n.length();
+                if (len > 1e-8f) {
+                    n /= len;
+                } else {
+                    n = geometric_normal; // Fallback if SDF gradient is zero
+                }
+            } else {
+                n = geometric_normal;
+            }
+
+            final_vertices.set(current_vertex_idx, v);
+            final_normals.set(current_vertex_idx, n);
+            final_indices.set(current_vertex_idx, current_vertex_idx); // 1:1 mapping
+            
+            current_vertex_idx++;
+        }
+    };
+
+    // 3. Process Base chunk triangles
     for (size_t i = 0; i + 2 < raw_indices.size(); i += 3) {
-        const int a = static_cast<int>(raw_indices[i]);
-        const int b = static_cast<int>(raw_indices[i + 1]);
-        const int c = static_cast<int>(raw_indices[i + 2]);
-
-        if (a < 0 || b < 0 || c < 0 || a >= vertices.size() || b >= vertices.size() || c >= vertices.size()) {
-            continue;
-        }
-        if (a == b || b == c || c == a) {
-            continue;
-        }
-
-        const Vector3 va = vertices[a];
-        const Vector3 vb = vertices[b];
-        const Vector3 vc = vertices[c];
-        const Vector3 face_normal = (vb - va).cross(vc - va);
-
-        if (face_normal.length_squared() <= min_area_sq) {
-            continue;
-        }
-
-        normals.set(a, normals[a] + face_normal);
-        normals.set(b, normals[b] + face_normal);
-        normals.set(c, normals[c] + face_normal);
-
-        indices.push_back(a);
-        indices.push_back(b);
-        indices.push_back(c);
+        process_triangle(
+            static_cast<int>(raw_indices[i]),
+            static_cast<int>(raw_indices[i + 1]),
+            static_cast<int>(raw_indices[i + 2])
+        );
     }
 
-    // Add patch triangles, offset by base vertex count.
+    // 4. Process Outer/Patch triangles (offset by base_vertex_count)
     for (int i = 0; i + 2 < outer_raw_indices.size(); i += 3) {
-        const int oa = static_cast<int>(outer_raw_indices[i]);
-        const int ob = static_cast<int>(outer_raw_indices[i + 1]);
-        const int oc = static_cast<int>(outer_raw_indices[i + 2]);
-
-        if (oa < 0 || ob < 0 || oc < 0 || oa >= outer_vertex_count || ob >= outer_vertex_count || oc >= outer_vertex_count) {
-            continue;
-        }
-
-        const int a = base_vertex_count + oa;
-        const int b = base_vertex_count + ob;
-        const int c = base_vertex_count + oc;
-
-        if (a == b || b == c || c == a) {
-            continue;
-        }
-
-        const Vector3 va = vertices[a];
-        const Vector3 vb = vertices[b];
-        const Vector3 vc = vertices[c];
-        const Vector3 face_normal = (vb - va).cross(vc - va);
-
-        if (face_normal.length_squared() <= min_area_sq) {
-            continue;
-        }
-
-        normals.set(a, normals[a] + face_normal);
-        normals.set(b, normals[b] + face_normal);
-        normals.set(c, normals[c] + face_normal);
-
-        indices.push_back(a);
-        indices.push_back(b);
-        indices.push_back(c);
+        process_triangle(
+            base_vertex_count + static_cast<int>(outer_raw_indices[i]),
+            base_vertex_count + static_cast<int>(outer_raw_indices[i + 1]),
+            base_vertex_count + static_cast<int>(outer_raw_indices[i + 2])
+        );
     }
 
-    if (indices.is_empty()) {
+    // 5. Shrink arrays to fit exactly the number of valid vertices produced
+    if (current_vertex_idx == 0) {
         mesh_instance->set_mesh(Ref<ArrayMesh>());
         return;
     }
 
-    for (int i = 0; i < normals.size(); ++i) {
-        Vector3 n = normals[i];
-        const float len = n.length();
-        if (len > 1e-8f) {
-            n /= len;
-        } else {
-            n = Vector3(0.0f, 1.0f, 0.0f);
-        }
-        normals.set(i, n);
-    }
+    final_vertices.resize(current_vertex_idx);
+    final_normals.resize(current_vertex_idx);
+    final_indices.resize(current_vertex_idx);
 
+    // 6. Build the Godot ArrayMesh
     Array arrays;
     arrays.resize(Mesh::ARRAY_MAX);
-    arrays[Mesh::ARRAY_VERTEX] = vertices;
-    arrays[Mesh::ARRAY_NORMAL] = normals;
-    arrays[Mesh::ARRAY_INDEX] = indices;
+    arrays[Mesh::ARRAY_VERTEX] = final_vertices;
+    arrays[Mesh::ARRAY_NORMAL] = final_normals;
+    arrays[Mesh::ARRAY_INDEX] = final_indices;
 
     Ref<ArrayMesh> chunk_mesh;
     chunk_mesh.instantiate();
