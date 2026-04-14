@@ -5,7 +5,7 @@
 [node name="Node" type="Node" unique_id=964298627]
 
 [node name="VoxelEngineClass" type="VoxelEngineClass" parent="." unique_id=31545966]
-lod_distances = PackedFloat32Array(17.593544, 35.187088, 70.374176, 140.74835, 281.4967)
+lod_distances = PackedFloat32Array(20.106907, 40.213814, 80.42763, 160.85526, 321.7105)
 script = ExtResource("1_2jas5")
 
 [node name="Marker3D" type="Marker3D" parent="." unique_id=2116868861]

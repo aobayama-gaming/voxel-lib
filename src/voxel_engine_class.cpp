@@ -160,7 +160,7 @@ void VoxelEngineClass::_process(double delta) {
     if (new_center_chunk != center_chunk) {
         center_chunk = new_center_chunk;
         run_chunk_pipeline();
-        //print_line(vformat("New center chunk: %s", center_chunk));
+        print_line(vformat("New center chunk: %s", center_chunk));
     }
 }
 
@@ -195,6 +195,8 @@ void VoxelEngineClass::scan_chunks_to_load() {
     const Vector3i start_scan = ancestor_chunk - search_space;
 
     const Vector3i end_scan = ancestor_chunk + search_space;
+
+    //scanned_chunks.insert(Vector3i(-21, 3, 1));
 
     for (int x = start_scan.x; x <= end_scan.x; x += max_lod_radius) {
         for (int y = start_scan.y; y <= end_scan.y; y += max_lod_radius) {

@@ -137,20 +137,30 @@ void MeshBufferClass::second_pass(const int32_t p_y_cell,const int32_t p_z_cell)
     meta.start_trim = MIN(meta.x_start_trim,MIN(vertices_data.metadata(p_y_cell+1, p_z_cell).x_start_trim,vertices_data.metadata(p_y_cell, p_z_cell+1).x_start_trim));
     meta.end_trim = MAX(meta.x_end_trim,MAX(vertices_data.metadata(p_y_cell+1, p_z_cell).x_end_trim,vertices_data.metadata(p_y_cell, p_z_cell+1).x_end_trim));
 
+    uint32_t end_condition = meta.end_trim;
+    uint32_t start_condition = meta.start_trim;
+
+    if (z_max) {
+        vertices_data.metadata(p_y_cell, p_z_cell+1).start_trim = MIN(vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_start_trim,MIN(vertices_data.metadata(p_y_cell, p_z_cell+1).x_start_trim,vertices_data.metadata(p_y_cell+1, p_z_cell).x_start_trim));
+        vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim = MAX(vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_end_trim,MAX(vertices_data.metadata(p_y_cell, p_z_cell+1).x_end_trim,vertices_data.metadata(p_y_cell+1, p_z_cell).x_end_trim));
+        
+        start_condition = MIN(start_condition,vertices_data.metadata(p_y_cell, p_z_cell+1).start_trim);
+        end_condition = MAX(end_condition,vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim);
+
+        // meta.start_trim = MIN(vertices_data.metadata(p_y_cell, p_z_cell+1).start_trim,meta.start_trim );
+        // meta.end_trim = MAX(vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim, meta.end_trim);
+    }
 
     if (y_max) {
-        vertices_data.metadata(p_y_cell+1, p_z_cell).start_trim = MIN(vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_start_trim,MIN(vertices_data.metadata(p_y_cell+1, p_z_cell).x_start_trim, meta.x_start_trim));
-        vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim = MAX(vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_end_trim,MAX(vertices_data.metadata(p_y_cell+1, p_z_cell).x_end_trim, meta.x_end_trim));
+        vertices_data.metadata(p_y_cell+1, p_z_cell).start_trim = MIN(vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_start_trim,MIN(vertices_data.metadata(p_y_cell, p_z_cell+1).x_start_trim,vertices_data.metadata(p_y_cell+1, p_z_cell).x_start_trim));
+        vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim = MAX(vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_end_trim,MAX(vertices_data.metadata(p_y_cell, p_z_cell+1).x_end_trim,vertices_data.metadata(p_y_cell+1, p_z_cell).x_end_trim));
 
-        meta.start_trim = MIN(vertices_data.metadata(p_y_cell+1, p_z_cell).start_trim,meta.start_trim );
-        meta.end_trim = MAX(vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim, meta.end_trim);
+        start_condition = MIN(start_condition,vertices_data.metadata(p_y_cell+1, p_z_cell).start_trim);
+        end_condition = MAX(end_condition,vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim);
+        // meta.start_trim = MIN(vertices_data.metadata(p_y_cell+1, p_z_cell).start_trim,meta.start_trim );
+        // meta.end_trim = MAX(vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim, meta.end_trim);
     }
-    if (z_max) {
-        vertices_data.metadata(p_y_cell, p_z_cell+1).start_trim = MIN(vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_start_trim,MIN(vertices_data.metadata(p_y_cell, p_z_cell+1).x_start_trim, meta.x_start_trim));
-        vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim = MAX(vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_end_trim,MAX(vertices_data.metadata(p_y_cell, p_z_cell+1).x_end_trim, meta.x_end_trim));
-        meta.start_trim = MIN(vertices_data.metadata(p_y_cell, p_z_cell+1).start_trim,meta.start_trim );
-        meta.end_trim = MAX(vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim, meta.end_trim);
-    }
+
 
     //edge case for x_start transfer for the border line
     if(y_max && z_max){
@@ -159,13 +169,15 @@ void MeshBufferClass::second_pass(const int32_t p_y_cell,const int32_t p_z_cell)
     }
 
 
+
+
     const bool collapsed_trim = ( meta.end_trim == 0);
     meta.end_trim+=collapsed_trim;
 
-    uint32_t end_condition = meta.end_trim;
-    uint32_t start_condition = meta.start_trim;
 
-    for( int32_t x=start_condition ; x<end_condition ; x++){
+
+    //for( int32_t x=start_condition ; x<end_condition ; x++){
+    for( int32_t x=0 ; x<vertices_data.width ; x++){
 
         const uint32_t top_left_case = vertices_data.x_edge_cases(x,p_y_cell,p_z_cell);
         const uint32_t top_right_case = vertices_data.x_edge_cases(x,p_y_cell+1,p_z_cell);
@@ -192,25 +204,29 @@ void MeshBufferClass::second_pass(const int32_t p_y_cell,const int32_t p_z_cell)
         
         if(x>0 && x ==start_condition )
         {
+            bool rerun = false;
+
             if(front_top_changed || front_left_changed){
                 meta.start_trim = 0;
                 start_condition = 0;
                 x=-1;
-                continue;
+                rerun= true;
             }
             if(y_max && front_right_changed){
                 vertices_data.metadata(p_y_cell+1,p_z_cell).start_trim=0;
                 start_condition = 0;
                 x=-1;
-                continue;
+                rerun= true;
             }
             if(z_max && front_bottom_changed){
                 vertices_data.metadata(p_y_cell,p_z_cell+1).start_trim=0;
                 start_condition = 0;
                 x=-1;
+                rerun= true;
+            }
+            if(rerun){
                 continue;
             }
-
         }
 
         if(y_max){
@@ -287,8 +303,8 @@ void MeshBufferClass::second_half_pass(const int32_t p_y_cell,const int32_t p_z_
                 vertices_data.metadata(p_y_cell + 1, p_z_cell + 1).end_trim))
     );
 
-    for( int32_t x=x_start ; x<x_end ; x++){
-
+    //for( int32_t x=x_start ; x<x_end ; x++){
+    for( int32_t x=0 ; x<vertices_data.width ; x++){
 
         vertices_data.metadata(p_y_cell, p_z_cell).counts.point+= _cell_has_point(x, p_y_cell, p_z_cell) ;
 
@@ -316,7 +332,7 @@ uint32_t MeshEdgeUtils::transversal_combination(uint32_t origin_edge, uint32_t p
 void MeshBufferClass::_find_edge_intersection(const Vector3i &start_point, const Vector3i &end_point, const uint32_t edge_case, VerticesData::EdgeCompute &edge_data, uint32_t &index)
 {
     if(edge_case==1 || edge_case==2){
-        //dummy implementation
+        
 
         bool left = edge_case & 0b01u;
         bool right = (edge_case & 0b10u) >> 1;
@@ -352,15 +368,54 @@ void MeshBufferClass::_find_edge_intersection(const Vector3i &start_point, const
 void MeshBufferClass::third_pass(const int32_t p_y_edge,const int32_t p_z_edge)
 {
 
-    uint32_t x_edge_counter = vertices_data.metadata.cum(p_y_edge,p_z_edge).x_edge -1 ; // Init the counter at the end of array
+    uint32_t x_edge_counter = vertices_data.metadata.cum(p_y_edge,p_z_edge).x_edge -1; // Init the counter at the end of array
     uint32_t y_edge_counter = vertices_data.metadata.cum(p_y_edge,p_z_edge).y_edge -1; // Init the counter at the end of array
     uint32_t z_edge_counter = vertices_data.metadata.cum(p_y_edge,p_z_edge).z_edge -1; // Init the counter at the end of array
 
     const bool y_max = p_y_edge==vertices_data.height-1;
     const bool z_max = p_z_edge==vertices_data.depth-1;
 
-    for( int32_t x=vertices_data.metadata(p_y_edge,p_z_edge).start_trim ; x<vertices_data.metadata(p_y_edge,p_z_edge).end_trim ; x++){
-    //for( int32_t x=0 ; x<vertices_data.width ; x++){
+    // const int32_t x_start = MIN(
+    // vertices_data.metadata(p_y_edge, p_z_edge).start_trim,
+    // MIN(vertices_data.metadata(p_y_edge + 1, p_z_edge).start_trim,
+    //     MIN(vertices_data.metadata(p_y_edge, p_z_edge + 1).start_trim,
+    //         vertices_data.metadata(p_y_edge + 1, p_z_edge + 1).start_trim))
+    // );
+
+    // const int32_t x_end = MAX(
+    //     vertices_data.metadata(p_y_edge, p_z_edge).end_trim,
+    //     MAX(vertices_data.metadata(p_y_edge + 1, p_z_edge).end_trim,
+    //         MAX(vertices_data.metadata(p_y_edge, p_z_edge + 1).end_trim,
+    //             vertices_data.metadata(p_y_edge + 1, p_z_edge + 1).end_trim))
+    // );
+    int32_t x_start = vertices_data.metadata(p_y_edge, p_z_edge).start_trim;
+    int32_t x_end = vertices_data.metadata(p_y_edge, p_z_edge).end_trim;
+
+    // if(!y_max){
+    //     x_start = MIN(x_start,vertices_data.metadata(p_y_edge + 1, p_z_edge).start_trim);
+    // }
+
+    // if(!z_max){
+    //     x_end = MAX(x_end,vertices_data.metadata(p_y_edge, p_z_edge + 1).end_trim);
+    // }
+
+    // const int32_t x_start = MIN(
+    // vertices_data.metadata(p_y_edge, p_z_edge).start_trim,
+    // vertices_data.metadata(p_y_edge + 1, p_z_edge).start_trim
+    // );
+    // const int32_t x_end = MAX(
+    //     vertices_data.metadata(p_y_edge, p_z_edge).end_trim,
+    //     vertices_data.metadata(p_y_edge, p_z_edge + 1).end_trim
+    // );
+
+    // const int32_t x_start = 0;
+
+    // const int32_t x_end = vertices_data.width;
+
+
+
+    //for( int32_t x=x_start ; x<x_end ; x++){
+    for( int32_t x=0 ; x<vertices_data.width ; x++){
 
         const uint32_t x_edge = vertices_data.x_edge_cases(x,p_y_edge,p_z_edge);
         const Vector3i start_position = Vector3i(x,p_y_edge,p_z_edge);
@@ -386,7 +441,7 @@ void MeshBufferClass::third_pass(const int32_t p_y_edge,const int32_t p_z_edge)
     }
 
     //escaping edge case (not symetric with entry case because we check by default the entry y,z edge with the first x edge)
-    if(vertices_data.metadata(p_y_edge,p_z_edge).end_trim == vertices_data.width){
+    if(x_end == vertices_data.width){
 
         const uint32_t x = vertices_data.width-1;
         const Vector3i start_position = Vector3i(x+1,p_y_edge,p_z_edge);
@@ -494,6 +549,7 @@ void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,
     uint32_t front_left_edge_counter = vertices_data.metadata.cum(p_y_cell,p_z_cell).z_edge -1; // Init the counter at the end of array
     uint32_t front_right_edge_counter = vertices_data.metadata.cum(p_y_cell+1,p_z_cell).z_edge -1; // Init the counter at the end of array
 
+
     uint32_t vertices_counter = vertices_data.metadata.cum(p_y_cell,p_z_cell).point-1;  
 
     const int32_t x_start = MIN(
@@ -515,8 +571,8 @@ void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,
     const float cell_size = VoxelEngineConstants::VOXEL_SIZE * static_cast<float>(1 << lod);
     const float inv_cell_size = (1.0f / cell_size);
 
-    for( int32_t x=x_start ; x<x_end ; x++){
-
+    //for( int32_t x=x_start ; x<x_end ; x++){
+    for( int32_t x=0 ; x<vertices_data.width ; x++){
         Basis A = Basis(0,0,0,0,0,0,0,0,0);
         Vector3 b = Vector3(0,0,0);
 
@@ -561,9 +617,9 @@ void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,
             const Vector3 &local_position = edge.local_positions[edge_index];
             const Vector3 position = (ChunkMath::vertices_to_world(chunk_id, local_position) - mid_cell) * inv_cell_size;
 
-            if(position.length() > 0.9f){
-                print_line("out of bound");
-            }
+            // if(position.length() > 0.9f){
+            //     print_line("out of bound");
+            // }
 
             _accumulate_qef(edge.normals[edge_index], position, A, b);
             mass_point += position;
@@ -634,6 +690,33 @@ void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,
 
         //decrease the counter for the next pass
 
+        // if(top_left_edge_counter<vertices_data.metadata.cum(p_y_cell,p_z_cell).x_edge-vertices_data.metadata(p_y_cell,p_z_cell).counts.x_edge-1){
+        //     print_line("overflow top_left x_edge");
+        // }
+        // if(top_right_edge_counter<vertices_data.metadata.cum(p_y_cell+1,p_z_cell).x_edge-vertices_data.metadata(p_y_cell+1,p_z_cell).counts.x_edge-1){
+        //     print_line("overflow top_right x_edge");
+        // }
+        // if(bottom_left_edge_counter<vertices_data.metadata.cum(p_y_cell,p_z_cell+1).x_edge-vertices_data.metadata(p_y_cell,p_z_cell+1).counts.x_edge-1){
+        //     print_line("overflow bottom_left x_edge");
+        // }
+        // if(bottom_right_edge_counter<vertices_data.metadata.cum(p_y_cell+1,p_z_cell+1).x_edge-vertices_data.metadata(p_y_cell+1,p_z_cell+1).counts.x_edge-1){
+        //     print_line("overflow bottom_right x_edge");
+        // }
+
+        // if(front_top_edge_counter<vertices_data.metadata.cum(p_y_cell,p_z_cell).y_edge-vertices_data.metadata(p_y_cell,p_z_cell).counts.y_edge-1){
+        //     print_line("overflow front_top y_edge");
+        // }
+        // if(front_bottom_edge_counter<vertices_data.metadata.cum(p_y_cell,p_z_cell+1).y_edge-vertices_data.metadata(p_y_cell,p_z_cell+1).counts.y_edge-1){
+        //     print_line("overflow front_bottom y_edge");
+        // }
+
+        // if(front_left_edge_counter<vertices_data.metadata.cum(p_y_cell,p_z_cell).z_edge-vertices_data.metadata(p_y_cell,p_z_cell).counts.z_edge-1){
+        //     print_line("overflow front_left z_edge");
+        // }
+        // if(front_right_edge_counter<vertices_data.metadata.cum(p_y_cell+1,p_z_cell).z_edge-vertices_data.metadata(p_y_cell+1,p_z_cell).counts.z_edge-1){
+        //     print_line("overflow front_right z_edge");
+        // }
+
         top_left_edge_counter -= top_left_changed;
         top_right_edge_counter -= top_right_changed;
         bottom_left_edge_counter -= bottom_left_changed;
@@ -694,7 +777,6 @@ void MeshBufferClass::fifth_pass(const int32_t p_y_qcell, const int32_t p_z_qcel
     uint32_t x_edge_counter = vertices_data.metadata.cum(y + 1, z + 1).x_edge - 1;
     uint32_t y_edge_counter = vertices_data.metadata.cum(y + 1, z + 1).y_edge - 1;
     uint32_t z_edge_counter = vertices_data.metadata.cum(y + 1, z + 1).z_edge - 1;
-
     uint32_t y_far_edge_counter = vertices_data.metadata.cum(y, z + 1).y_edge - 1;
     uint32_t z_far_edge_counter = vertices_data.metadata.cum(y + 1, z).z_edge - 1;
 
