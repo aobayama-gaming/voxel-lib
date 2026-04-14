@@ -11,8 +11,8 @@
 namespace {
 bool _chunk_is_outside_sdf(const SDFBase &sdf, const Vector3i &chunk_pos) {
     const float chunk_size = ChunkMath::world_chunk_size(chunk_pos);
-    const float half_size = chunk_size * 0.25f;
-    const float chunk_outer_radius = chunk_size ; //0.8660254f
+    const float half_size = chunk_size * 0.5f;
+    const float chunk_outer_radius = chunk_size*2 ; //0.8660254f
     const Vector3 chunk_center = ChunkMath::chunk_to_world(chunk_pos);
 
     for (int corner = 0; corner < 8; ++corner) {
@@ -98,7 +98,7 @@ void VoxelEngineClass::_ready() {
         //     value *= phi;
         // }
         // Configuration
-        const int lod_levels = 4;
+        const int lod_levels = 1;
 
         // LOD thresholds are stored in chunk-coordinate units because the scan
         // logic compares them against chunk-space distances.

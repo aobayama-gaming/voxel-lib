@@ -26,12 +26,47 @@ public:
     //     return p_world_pos / std::sqrt(len_sq);
     // }
 
-    // Sinusoidal terrain-like SDF idea:
+    // Repeated cube SDF + sinusoidal terrain term.
+    // Positive means inside/solid (project convention).
     float evaluate(const Vector3 &p_world_pos) const override {
         const float wave_x = std::sin(p_world_pos.x * 1.5f);
         const float wave_z = std::sin(p_world_pos.z * 1.2f);
-        //const float ripple = 0.35f*std::sin((p_world_pos.x + p_world_pos.z) * 2.0f);
-        return -p_world_pos.y + (wave_x + wave_z );
+        const float terrain = -p_world_pos.y + (wave_x + wave_z);
+
+        const float period = 6.0f;
+        const Vector3 half_size(1.4f, 1.4f, 1.4f);
+
+        const auto repeat_axis = [period](float v) {
+            // Wrap axis to [-period/2, period/2] for tiled cells.
+            return v - period * std::floor(v / period + 0.5f);
+        };
+
+        const Vector3 q(
+            repeat_axis(p_world_pos.x),
+            repeat_axis(p_world_pos.y),
+            repeat_axis(p_world_pos.z)
+        );
+
+        // Standard box SDF with negative-inside convention.
+        const Vector3 d(
+            std::abs(q.x) - half_size.x,
+            std::abs(q.y) - half_size.y,
+            std::abs(q.z) - half_size.z
+        );
+
+        const Vector3 d_max(
+            std::max(d.x, 0.0f),
+            std::max(d.y, 0.0f),
+            std::max(d.z, 0.0f)
+        );
+
+        const float outside = d_max.length();
+        const float inside = std::min(std::max(d.x, std::max(d.y, d.z)), 0.0f);
+        const float sdf_negative_inside = outside + inside;
+        const float repeated_cube = -sdf_negative_inside;
+
+        // Union: keep either terrain or repeated cubes as solid.
+        return std::max(terrain, repeated_cube);
     }
     
     // Sinusoidal blob idea:

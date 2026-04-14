@@ -4,7 +4,7 @@
 
 #include <cmath>
 
-inline constexpr int BINARY_SEARCH_STEP = 5;
+inline constexpr int BINARY_SEARCH_STEP = 7;
 
 namespace {
 
@@ -134,50 +134,50 @@ void MeshBufferClass::second_pass(const int32_t p_y_cell,const int32_t p_z_cell)
     const bool z_max = p_z_cell==vertices_data.depth-2;
 
     // in some weird surface this case can happens
-    meta.start_trim = MIN(meta.x_start_trim,MIN(vertices_data.metadata(p_y_cell+1, p_z_cell).x_start_trim,vertices_data.metadata(p_y_cell, p_z_cell+1).x_start_trim));
-    meta.end_trim = MAX(meta.x_end_trim,MAX(vertices_data.metadata(p_y_cell+1, p_z_cell).x_end_trim,vertices_data.metadata(p_y_cell, p_z_cell+1).x_end_trim));
+    // meta.start_trim = MIN(meta.x_start_trim,MIN(vertices_data.metadata(p_y_cell+1, p_z_cell).x_start_trim,vertices_data.metadata(p_y_cell, p_z_cell+1).x_start_trim));
+    // meta.end_trim = MAX(meta.x_end_trim,MAX(vertices_data.metadata(p_y_cell+1, p_z_cell).x_end_trim,vertices_data.metadata(p_y_cell, p_z_cell+1).x_end_trim));
 
-    uint32_t end_condition = meta.end_trim;
-    uint32_t start_condition = meta.start_trim;
+    uint32_t end_condition = vertices_data.width;
+    uint32_t start_condition = 0;
 
-    if (z_max) {
-        vertices_data.metadata(p_y_cell, p_z_cell+1).start_trim = MIN(vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_start_trim,MIN(vertices_data.metadata(p_y_cell, p_z_cell+1).x_start_trim,vertices_data.metadata(p_y_cell+1, p_z_cell).x_start_trim));
-        vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim = MAX(vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_end_trim,MAX(vertices_data.metadata(p_y_cell, p_z_cell+1).x_end_trim,vertices_data.metadata(p_y_cell+1, p_z_cell).x_end_trim));
+    // if (z_max) {
+    //     vertices_data.metadata(p_y_cell, p_z_cell+1).start_trim = MIN(vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_start_trim,MIN(vertices_data.metadata(p_y_cell, p_z_cell+1).x_start_trim,vertices_data.metadata(p_y_cell+1, p_z_cell).x_start_trim));
+    //     vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim = MAX(vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_end_trim,MAX(vertices_data.metadata(p_y_cell, p_z_cell+1).x_end_trim,vertices_data.metadata(p_y_cell+1, p_z_cell).x_end_trim));
         
-        start_condition = MIN(start_condition,vertices_data.metadata(p_y_cell, p_z_cell+1).start_trim);
-        end_condition = MAX(end_condition,vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim);
+    //     start_condition = MIN(start_condition,vertices_data.metadata(p_y_cell, p_z_cell+1).start_trim);
+    //     end_condition = MAX(end_condition,vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim);
 
-        // meta.start_trim = MIN(vertices_data.metadata(p_y_cell, p_z_cell+1).start_trim,meta.start_trim );
-        // meta.end_trim = MAX(vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim, meta.end_trim);
-    }
+    //     // meta.start_trim = MIN(vertices_data.metadata(p_y_cell, p_z_cell+1).start_trim,meta.start_trim );
+    //     // meta.end_trim = MAX(vertices_data.metadata(p_y_cell, p_z_cell+1).end_trim, meta.end_trim);
+    // }
 
-    if (y_max) {
-        vertices_data.metadata(p_y_cell+1, p_z_cell).start_trim = MIN(vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_start_trim,MIN(vertices_data.metadata(p_y_cell, p_z_cell+1).x_start_trim,vertices_data.metadata(p_y_cell+1, p_z_cell).x_start_trim));
-        vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim = MAX(vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_end_trim,MAX(vertices_data.metadata(p_y_cell, p_z_cell+1).x_end_trim,vertices_data.metadata(p_y_cell+1, p_z_cell).x_end_trim));
+    // if (y_max) {
+    //     vertices_data.metadata(p_y_cell+1, p_z_cell).start_trim = MIN(vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_start_trim,MIN(vertices_data.metadata(p_y_cell, p_z_cell+1).x_start_trim,vertices_data.metadata(p_y_cell+1, p_z_cell).x_start_trim));
+    //     vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim = MAX(vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_end_trim,MAX(vertices_data.metadata(p_y_cell, p_z_cell+1).x_end_trim,vertices_data.metadata(p_y_cell+1, p_z_cell).x_end_trim));
 
-        start_condition = MIN(start_condition,vertices_data.metadata(p_y_cell+1, p_z_cell).start_trim);
-        end_condition = MAX(end_condition,vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim);
-        // meta.start_trim = MIN(vertices_data.metadata(p_y_cell+1, p_z_cell).start_trim,meta.start_trim );
-        // meta.end_trim = MAX(vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim, meta.end_trim);
-    }
-
-
-    //edge case for x_start transfer for the border line
-    if(y_max && z_max){
-        vertices_data.metadata(p_y_cell+1, p_z_cell+1).start_trim =vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_start_trim;
-        vertices_data.metadata(p_y_cell+1, p_z_cell+1).end_trim =vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_end_trim;
-    }
+    //     start_condition = MIN(start_condition,vertices_data.metadata(p_y_cell+1, p_z_cell).start_trim);
+    //     end_condition = MAX(end_condition,vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim);
+    //     // meta.start_trim = MIN(vertices_data.metadata(p_y_cell+1, p_z_cell).start_trim,meta.start_trim );
+    //     // meta.end_trim = MAX(vertices_data.metadata(p_y_cell+1, p_z_cell).end_trim, meta.end_trim);
+    // }
 
 
-
-
-    const bool collapsed_trim = ( meta.end_trim == 0);
-    meta.end_trim+=collapsed_trim;
+    // //edge case for x_start transfer for the border line
+    // if(y_max && z_max){
+    //     vertices_data.metadata(p_y_cell+1, p_z_cell+1).start_trim =vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_start_trim;
+    //     vertices_data.metadata(p_y_cell+1, p_z_cell+1).end_trim =vertices_data.metadata(p_y_cell+1, p_z_cell+1).x_end_trim;
+    // }
 
 
 
-    //for( int32_t x=start_condition ; x<end_condition ; x++){
-    for( int32_t x=0 ; x<vertices_data.width ; x++){
+
+    // const bool collapsed_trim = ( meta.end_trim == 0);
+    // meta.end_trim+=collapsed_trim;
+
+
+
+    for( int32_t x=start_condition ; x<end_condition ; x++){
+    //for( int32_t x=0 ; x<vertices_data.width ; x++){
 
         const uint32_t top_left_case = vertices_data.x_edge_cases(x,p_y_cell,p_z_cell);
         const uint32_t top_right_case = vertices_data.x_edge_cases(x,p_y_cell+1,p_z_cell);
@@ -202,32 +202,32 @@ void MeshBufferClass::second_pass(const int32_t p_y_cell,const int32_t p_z_cell)
         const bool rear_left_changed = MeshEdgeUtils::transversal_change(top_left_case, bottom_left_case, false); //z
         const bool rear_right_changed = MeshEdgeUtils::transversal_change(top_right_case, bottom_right_case, false); //z
         
-        if(x>0 && x ==start_condition )
-        {
-            bool rerun = false;
+        // if(x>0 && x ==start_condition )
+        // {
+        //     bool rerun = false;
 
-            if(front_top_changed || front_left_changed){
-                meta.start_trim = 0;
-                start_condition = 0;
-                x=-1;
-                rerun= true;
-            }
-            if(y_max && front_right_changed){
-                vertices_data.metadata(p_y_cell+1,p_z_cell).start_trim=0;
-                start_condition = 0;
-                x=-1;
-                rerun= true;
-            }
-            if(z_max && front_bottom_changed){
-                vertices_data.metadata(p_y_cell,p_z_cell+1).start_trim=0;
-                start_condition = 0;
-                x=-1;
-                rerun= true;
-            }
-            if(rerun){
-                continue;
-            }
-        }
+        //     if(front_top_changed || front_left_changed){
+        //         meta.start_trim = 0;
+        //         start_condition = 0;
+        //         x=-1;
+        //         rerun= true;
+        //     }
+        //     if(y_max && front_right_changed){
+        //         vertices_data.metadata(p_y_cell+1,p_z_cell).start_trim=0;
+        //         start_condition = 0;
+        //         x=-1;
+        //         rerun= true;
+        //     }
+        //     if(z_max && front_bottom_changed){
+        //         vertices_data.metadata(p_y_cell,p_z_cell+1).start_trim=0;
+        //         start_condition = 0;
+        //         x=-1;
+        //         rerun= true;
+        //     }
+        //     if(rerun){
+        //         continue;
+        //     }
+        // }
 
         if(y_max){
             vertices_data.metadata(p_y_cell+1,p_z_cell).counts.z_edge += front_right_changed;
@@ -249,62 +249,64 @@ void MeshBufferClass::second_pass(const int32_t p_y_cell,const int32_t p_z_cell)
 
                 if(y_max){ // Edge case for max height
                     vertices_data.metadata(p_y_cell+1,p_z_cell).counts.z_edge += rear_right_changed;
-                    if(rear_right_changed) vertices_data.metadata(p_y_cell+1,p_z_cell).end_trim = vertices_data.width;
+                    //if(rear_right_changed) vertices_data.metadata(p_y_cell+1,p_z_cell).end_trim = vertices_data.width;
 
                 }
                 if(z_max){ // Edge case for max depth
                     vertices_data.metadata(p_y_cell,p_z_cell+1).counts.y_edge += rear_bottom_changed;
-                    if(rear_bottom_changed) vertices_data.metadata(p_y_cell,p_z_cell+1).end_trim = vertices_data.width;
+                    //if(rear_bottom_changed) vertices_data.metadata(p_y_cell,p_z_cell+1).end_trim = vertices_data.width;
                 }
 
             }
-            else
-            {
+            // else
+            // {
 
-                if(y_max && rear_right_changed){ // Edge case for max height
-                    end_condition = vertices_data.width;
-                    vertices_data.metadata(p_y_cell+1,p_z_cell).end_trim=vertices_data.width;
-                }
+            //     if(y_max && rear_right_changed){ // Edge case for max height
+            //         end_condition = vertices_data.width;
+            //         vertices_data.metadata(p_y_cell+1,p_z_cell).end_trim=vertices_data.width;
+            //     }
 
-                if(z_max && rear_bottom_changed){ // Edge case for max depth
-                    end_condition = vertices_data.width;
-                    vertices_data.metadata(p_y_cell,p_z_cell+1).end_trim=vertices_data.width;
-                }
+            //     if(z_max && rear_bottom_changed){ // Edge case for max depth
+            //         end_condition = vertices_data.width;
+            //         vertices_data.metadata(p_y_cell,p_z_cell+1).end_trim=vertices_data.width;
+            //     }
 
-                if(rear_top_changed || rear_left_changed){
-                    meta.end_trim = vertices_data.width;
-                    end_condition = vertices_data.width;
-                }
+            //     if(rear_top_changed || rear_left_changed){
+            //         meta.end_trim = vertices_data.width;
+            //         end_condition = vertices_data.width;
+            //     }
 
-            }
+            // }
             
         }
 
     }
 
-    if( collapsed_trim && meta.end_trim ==1 ){
-        meta.end_trim=0;
-    }
+    // if( collapsed_trim && meta.end_trim ==1 ){
+    //     meta.end_trim=0;
+    // }
 }
 
 void MeshBufferClass::second_half_pass(const int32_t p_y_cell,const int32_t p_z_cell){
 
-    const int32_t x_start = MIN(
-    vertices_data.metadata(p_y_cell, p_z_cell).start_trim,
-    MIN(vertices_data.metadata(p_y_cell + 1, p_z_cell).start_trim,
-        MIN(vertices_data.metadata(p_y_cell, p_z_cell + 1).start_trim,
-            vertices_data.metadata(p_y_cell + 1, p_z_cell + 1).start_trim))
-    );
+    const int32_t x_start = 0;
+    const int32_t x_end = vertices_data.width;
+    // const int32_t x_start = MIN(
+    // vertices_data.metadata(p_y_cell, p_z_cell).start_trim,
+    // MIN(vertices_data.metadata(p_y_cell + 1, p_z_cell).start_trim,
+    //     MIN(vertices_data.metadata(p_y_cell, p_z_cell + 1).start_trim,
+    //         vertices_data.metadata(p_y_cell + 1, p_z_cell + 1).start_trim))
+    // );
 
-    const int32_t x_end = MAX(
-        vertices_data.metadata(p_y_cell, p_z_cell).end_trim,
-        MAX(vertices_data.metadata(p_y_cell + 1, p_z_cell).end_trim,
-            MAX(vertices_data.metadata(p_y_cell, p_z_cell + 1).end_trim,
-                vertices_data.metadata(p_y_cell + 1, p_z_cell + 1).end_trim))
-    );
+    // const int32_t x_end = MAX(
+    //     vertices_data.metadata(p_y_cell, p_z_cell).end_trim,
+    //     MAX(vertices_data.metadata(p_y_cell + 1, p_z_cell).end_trim,
+    //         MAX(vertices_data.metadata(p_y_cell, p_z_cell + 1).end_trim,
+    //             vertices_data.metadata(p_y_cell + 1, p_z_cell + 1).end_trim))
+    // );
 
-    //for( int32_t x=x_start ; x<x_end ; x++){
-    for( int32_t x=0 ; x<vertices_data.width ; x++){
+    for( int32_t x=x_start ; x<x_end ; x++){
+    //for( int32_t x=0 ; x<vertices_data.width ; x++){
 
         vertices_data.metadata(p_y_cell, p_z_cell).counts.point+= _cell_has_point(x, p_y_cell, p_z_cell) ;
 
@@ -388,8 +390,8 @@ void MeshBufferClass::third_pass(const int32_t p_y_edge,const int32_t p_z_edge)
     //         MAX(vertices_data.metadata(p_y_edge, p_z_edge + 1).end_trim,
     //             vertices_data.metadata(p_y_edge + 1, p_z_edge + 1).end_trim))
     // );
-    int32_t x_start = vertices_data.metadata(p_y_edge, p_z_edge).start_trim;
-    int32_t x_end = vertices_data.metadata(p_y_edge, p_z_edge).end_trim;
+    // int32_t x_start = vertices_data.metadata(p_y_edge, p_z_edge).start_trim;
+    // int32_t x_end = vertices_data.metadata(p_y_edge, p_z_edge).end_trim;
 
     // if(!y_max){
     //     x_start = MIN(x_start,vertices_data.metadata(p_y_edge + 1, p_z_edge).start_trim);
@@ -412,10 +414,11 @@ void MeshBufferClass::third_pass(const int32_t p_y_edge,const int32_t p_z_edge)
 
     // const int32_t x_end = vertices_data.width;
 
+    const int32_t x_start = 0;
+    const int32_t x_end = vertices_data.width;
 
-
-    //for( int32_t x=x_start ; x<x_end ; x++){
-    for( int32_t x=0 ; x<vertices_data.width ; x++){
+    for( int32_t x=x_start ; x<x_end ; x++){
+    //for( int32_t x=0 ; x<vertices_data.width ; x++){
 
         const uint32_t x_edge = vertices_data.x_edge_cases(x,p_y_edge,p_z_edge);
         const Vector3i start_position = Vector3i(x,p_y_edge,p_z_edge);
@@ -531,7 +534,7 @@ Vector3 MeshBufferClass::_surface_net_vertex(const Vector3 &mass_point_sum, int3
     return mass_point_sum / static_cast<float>(num_vertices);
 }
 
-void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,const float_t alpha=0.75f){
+void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,const float_t alpha=0.05f){
 
     if( p_y_cell>=vertices_data.height-1 || p_z_cell>=vertices_data.depth-1 ){
         //in case we run an extra row colum, this pass is iterate on CELL.
@@ -552,27 +555,30 @@ void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,
 
     uint32_t vertices_counter = vertices_data.metadata.cum(p_y_cell,p_z_cell).point-1;  
 
-    const int32_t x_start = MIN(
-        vertices_data.metadata(p_y_cell, p_z_cell).start_trim,
-        MIN(vertices_data.metadata(p_y_cell + 1, p_z_cell).start_trim,
-            MIN(vertices_data.metadata(p_y_cell, p_z_cell + 1).start_trim,
-                vertices_data.metadata(p_y_cell + 1, p_z_cell + 1).start_trim))
-    );
+    // const int32_t x_start = MIN(
+    //     vertices_data.metadata(p_y_cell, p_z_cell).start_trim,
+    //     MIN(vertices_data.metadata(p_y_cell + 1, p_z_cell).start_trim,
+    //         MIN(vertices_data.metadata(p_y_cell, p_z_cell + 1).start_trim,
+    //             vertices_data.metadata(p_y_cell + 1, p_z_cell + 1).start_trim))
+    // );
 
-    const int32_t x_end = MAX(
-        vertices_data.metadata(p_y_cell, p_z_cell).end_trim,
-        MAX(vertices_data.metadata(p_y_cell + 1, p_z_cell).end_trim,
-            MAX(vertices_data.metadata(p_y_cell, p_z_cell + 1).end_trim,
-                vertices_data.metadata(p_y_cell + 1, p_z_cell + 1).end_trim))
-    );
+    // const int32_t x_end = MAX(
+    //     vertices_data.metadata(p_y_cell, p_z_cell).end_trim,
+    //     MAX(vertices_data.metadata(p_y_cell + 1, p_z_cell).end_trim,
+    //         MAX(vertices_data.metadata(p_y_cell, p_z_cell + 1).end_trim,
+    //             vertices_data.metadata(p_y_cell + 1, p_z_cell + 1).end_trim))
+    // );
+
+    const int32_t x_start = 0;
+    const int32_t x_end = vertices_data.width;
 
     // Normalize QEF coordinates by cell size so conditioning stays consistent across LOD.
     const int32_t lod = ChunkMath::get_lod(chunk_id);
     const float cell_size = VoxelEngineConstants::VOXEL_SIZE * static_cast<float>(1 << lod);
     const float inv_cell_size = (1.0f / cell_size);
 
-    //for( int32_t x=x_start ; x<x_end ; x++){
-    for( int32_t x=0 ; x<vertices_data.width ; x++){
+    for( int32_t x=x_start ; x<x_end ; x++){
+    //for( int32_t x=0 ; x<vertices_data.width ; x++){
         Basis A = Basis(0,0,0,0,0,0,0,0,0);
         Vector3 b = Vector3(0,0,0);
 
@@ -646,17 +652,17 @@ void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,
         if(num_vertices > 0){
 
             // // Tikhonov regularization in normalized space (dimensionless).
-            // const float a = alpha;
+            const float a = alpha;
             
 
             // // QEF solve kept for later re-enable.
-            // A[0][0] +=a;
-            // A[1][1] +=a;
-            // A[2][2] +=a;
+            A[0][0] +=a;
+            A[1][1] +=a;
+            A[2][2] +=a;
 
             mass_point/=num_vertices;
 
-            // b+= a*mass_point;
+            b+= a*mass_point;
 
             // //const float det = A.determinant();
             // // if (std::abs(det) < 1.0f) {
@@ -668,19 +674,19 @@ void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,
             // //         num_vertices));
             // // }
 
-            // Vector3 qef_solution;
-            // const bool solved = solve_linear_system_3x3(A, b, qef_solution);
-            // const Vector3 final_vertex_world = ((solved ? qef_solution : mass_point) * cell_size) + mid_cell;
-            // Vector3 final_vertex = ChunkMath::world_to_vertices(chunk_id,final_vertex_world);
+            Vector3 qef_solution;
+            const bool solved = solve_linear_system_3x3(A, b, qef_solution);
+            const Vector3 final_vertex_world = ((solved ? qef_solution : mass_point) * cell_size) + mid_cell;
+            Vector3 final_vertex = ChunkMath::world_to_vertices(chunk_id,final_vertex_world);
             
 
             // const float margin = 0.1f;
 
             // Vector3 min_bound = Vector3(x+margin, p_y_cell+margin, p_z_cell+margin);
             // Vector3 max_bound = min_bound + Vector3(1.0f-margin, 1.0f-margin, 1.0f-margin);
-            // final_vertex = final_vertex.clamp(min_bound, max_bound);
+            //final_vertex = final_vertex.clamp(min_bound, max_bound);
 
-            const Vector3 final_vertex = ChunkMath::world_to_vertices(chunk_id,mass_point*cell_size+mid_cell);
+            //const Vector3 final_vertex = ChunkMath::world_to_vertices(chunk_id,mass_point*cell_size+mid_cell);
 
             vertices_data.points[vertices_counter]= final_vertex;
 
