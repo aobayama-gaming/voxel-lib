@@ -34,7 +34,7 @@ public:
         const float terrain = -p_world_pos.y + (wave_x + wave_z);
 
         const float period = 6.0f;
-        const Vector3 half_size(1.4f, 1.4f, 1.4f);
+        const Vector3 half_size(1.45f, 1.45f, 1.45f);
 
         const auto repeat_axis = [period](float v) {
             // Wrap axis to [-period/2, period/2] for tiled cells.

@@ -4,7 +4,7 @@
 
 #include <cmath>
 
-inline constexpr int BINARY_SEARCH_STEP = 5;
+inline constexpr int BINARY_SEARCH_STEP =7;
 
 namespace {
 
@@ -92,7 +92,9 @@ void MeshBufferClass::first_pass(const int32_t p_y_edge,const int32_t p_z_edge){
 
         const Vector3i vertices_coordinates =  Vector3i(x,p_y_edge,p_z_edge);
 
-        const float_t actual_value = sdf->evaluate(ChunkMath::vertices_to_world(chunk_id , vertices_coordinates));
+        const Vector3 evaluation_vector = ChunkMath::vertices_to_world(chunk_id , vertices_coordinates);
+
+        float_t actual_value = sdf->evaluate(ChunkMath::vertices_to_world(chunk_id , vertices_coordinates));
 
         if(x>0){
 
@@ -398,6 +400,9 @@ void MeshBufferClass::third_pass(const int32_t p_y_edge,const int32_t p_z_edge)
     int32_t x_start = vertices_data.metadata(p_y_edge, p_z_edge).start_trim;
     int32_t x_end = vertices_data.metadata(p_y_edge, p_z_edge).end_trim;
 
+    x_start = 0;
+    x_end = vertices_data.width;
+
     if(!y_max){
         x_start = MIN(x_start,vertices_data.metadata(p_y_edge + 1, p_z_edge).start_trim);
     }
@@ -523,7 +528,7 @@ Vector3 MeshBufferClass::_surface_net_vertex(const Vector3 &mass_point_sum, int3
     return mass_point_sum / static_cast<float>(num_vertices);
 }
 
-void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,const float_t alpha=0.05f){
+void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,const float_t alpha=0.01f){
 
     if( p_y_cell>=vertices_data.height-1 || p_z_cell>=vertices_data.depth-1 ){
         //in case we run an extra row colum, this pass is iterate on CELL.
@@ -544,19 +549,22 @@ void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,
 
     uint32_t vertices_counter = vertices_data.metadata.cum(p_y_cell,p_z_cell).point-1;  
 
-    const int32_t x_start = MIN(
+    int32_t x_start = MIN(
         vertices_data.metadata(p_y_cell, p_z_cell).start_trim,
         MIN(vertices_data.metadata(p_y_cell + 1, p_z_cell).start_trim,
             MIN(vertices_data.metadata(p_y_cell, p_z_cell + 1).start_trim,
                 vertices_data.metadata(p_y_cell + 1, p_z_cell + 1).start_trim))
     );
 
-    const int32_t x_end = MAX(
+    int32_t x_end = MAX(
         vertices_data.metadata(p_y_cell, p_z_cell).end_trim,
         MAX(vertices_data.metadata(p_y_cell + 1, p_z_cell).end_trim,
             MAX(vertices_data.metadata(p_y_cell, p_z_cell + 1).end_trim,
                 vertices_data.metadata(p_y_cell + 1, p_z_cell + 1).end_trim))
     );
+
+    x_start = 0;
+    x_end = vertices_data.width;
 
 
     // Normalize QEF coordinates by cell size so conditioning stays consistent across LOD.
@@ -664,13 +672,17 @@ void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,
             const bool solved = solve_linear_system_3x3(A, b, qef_solution);
             const Vector3 final_vertex_world = ((solved ? qef_solution : mass_point) * cell_size) + mid_cell;
             Vector3 final_vertex = ChunkMath::world_to_vertices(chunk_id,final_vertex_world);
+
+            if(!solved){
+                print_line("error generating chunk");
+            }
             
 
-            const float margin = 0.1f;
+            // const float margin = 0.1f;
 
-            Vector3 min_bound = Vector3(x+margin, p_y_cell+margin, p_z_cell+margin);
-            Vector3 max_bound = min_bound + Vector3(1.0f-margin, 1.0f-margin, 1.0f-margin);
-            final_vertex = final_vertex.clamp(min_bound, max_bound);
+            // Vector3 min_bound = Vector3(x+margin, p_y_cell+margin, p_z_cell+margin);
+            // Vector3 max_bound = min_bound + Vector3(1.0f-margin, 1.0f-margin, 1.0f-margin);
+            // final_vertex = final_vertex.clamp(min_bound, max_bound);
 
             //const Vector3 final_vertex = ChunkMath::world_to_vertices(chunk_id,mass_point*cell_size+mid_cell);
 
@@ -743,8 +755,8 @@ void MeshBufferClass::fifth_pass(const int32_t p_y_qcell, const int32_t p_z_qcel
     uint32_t x_edge_counter = vertices_data.metadata.cum(y + 1, z + 1).x_edge - 1;
     uint32_t y_edge_counter = vertices_data.metadata.cum(y + 1, z + 1).y_edge - 1;
     uint32_t z_edge_counter = vertices_data.metadata.cum(y + 1, z + 1).z_edge - 1;
-    uint32_t y_far_edge_counter = vertices_data.metadata.cum(y, z + 1).y_edge - 1;
-    uint32_t z_far_edge_counter = vertices_data.metadata.cum(y + 1, z).z_edge - 1;
+    // uint32_t y_far_edge_counter = vertices_data.metadata.cum(y, z + 1).y_edge - 1;
+    // uint32_t z_far_edge_counter = vertices_data.metadata.cum(y + 1, z).z_edge - 1;
 
     // Memory buffer indexing for the previous iteration
     uint32_t prev_x_idx_00 = 0, prev_x_idx_10 = 0, prev_x_idx_01 = 0, prev_x_idx_11 = 0;
@@ -800,6 +812,8 @@ void MeshBufferClass::fifth_pass(const int32_t p_y_qcell, const int32_t p_z_qcel
         if (v10) pt_10--;
         if (v01) pt_01--;
         if (v11) pt_11--;
+
+
 
         // Generate Y & Z Edge Quads mapping cells behind it
         if (x > 0) {

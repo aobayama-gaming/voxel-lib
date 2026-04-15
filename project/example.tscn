@@ -5,8 +5,17 @@
 [node name="Node" type="Node" unique_id=964298627]
 
 [node name="VoxelEngineClass" type="VoxelEngineClass" parent="." unique_id=31545966]
-lod_distances = PackedFloat32Array(20.106907, 40.213814)
+lod_distances = PackedFloat32Array(6.7023025, 13.404605, 26.80921, 53.61842, 107.23684, 214.47368, 428.94736, 857.8947, 1715.7894, 3431.5789, 6863.1577, 13726.315, 27452.63, 54905.26, 109810.52, 219621.05)
 script = ExtResource("1_2jas5")
 
 [node name="Marker3D" type="Marker3D" parent="." unique_id=2116868861]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.03347063, -1.0661538, 0)
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=157739657]
+transform = Transform3D(1, 0, 0, 0, 0.7713581, 0.6364014, 0, -0.6364014, 0.7713581, -54.516186, 4.542777, 25.598251)
+light_energy = 0.619
+light_indirect_energy = 0.0
+light_volumetric_fog_energy = 0.0
+light_angular_distance = 3.93
+light_specular = 0.0
+shadow_enabled = true

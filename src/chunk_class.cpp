@@ -4,8 +4,35 @@
 #include "godot_cpp/variant/packed_int32_array.hpp"
 
 #include <cmath>
+#include <cstdint>
 
 namespace {
+uint32_t hash_u32(uint32_t value) {
+    value ^= value >> 16;
+    value *= 0x7feb352du;
+    value ^= value >> 15;
+    value *= 0x846ca68bu;
+    value ^= value >> 16;
+    return value;
+}
+
+uint32_t chunk_pos_seed(const Vector3i &chunk_pos) {
+    uint32_t seed = 2166136261u;
+    seed = (seed ^ static_cast<uint32_t>(chunk_pos.x)) * 16777619u;
+    seed = (seed ^ static_cast<uint32_t>(chunk_pos.y)) * 16777619u;
+    seed = (seed ^ static_cast<uint32_t>(chunk_pos.z)) * 16777619u;
+    return hash_u32(seed);
+}
+
+float rand01(uint32_t &state) {
+    state = hash_u32(state + 0x9e3779b9u);
+    return static_cast<float>(state & 0x00ffffffu) / 16777215.0f;
+}
+
+float rand_signed(uint32_t &state) {
+    return rand01(state) * 2.0f - 1.0f;
+}
+
 Color hsv_to_rgb(float h, float s, float v) {
     h = h - std::floor(h);
     const float c = v * s;
@@ -51,7 +78,7 @@ void ChunkClass::initialize_debug(const Vector3i &p_chunk_pos, SDFBase *p_sdf) {
     mesh_info.initialize(chunk_pos,sdf);
     mesh_info.execute_on_self();
     _build_debug_mesh_point();
-    _build_debug_mesh_edge_points();
+    //_build_debug_mesh_edge_points();
 }
 
 void ChunkClass::initialize(const Vector3i &p_chunk_pos, SDFBase *p_sdf) {
@@ -63,7 +90,7 @@ void ChunkClass::initialize(const Vector3i &p_chunk_pos, SDFBase *p_sdf) {
     mesh_info.initialize(chunk_pos, sdf);
     mesh_info.execute_on_self();
     _build_chunk_mesh();
-    _build_debug_mesh_point();
+    //_build_debug_mesh_point();
 
     state = ChunkState::OUTER_MESH;
 }
@@ -118,7 +145,7 @@ void ChunkClass::_build_chunk_mesh() {
     
     int current_vertex_idx = 0;
     constexpr float min_area_sq = 1e-12f;
-    const float normal_inset = 0.1f; // 5% inset toward triangle midpoint
+    const float normal_inset = 0.01f; // 5% inset toward triangle midpoint
 
     // Lambda to process a single triangle, duplicate points, and calculate inset normals
     auto process_triangle = [&](int idx_a, int idx_b, int idx_c) {
@@ -288,16 +315,32 @@ void ChunkClass::_build_debug_mesh_point() {
 
     // Create vertex array
     PackedVector3Array vertices;
+    PackedColorArray colors;
     vertices.resize(static_cast<int>(points.size()));
+    colors.resize(static_cast<int>(points.size()));
+
+    const uint32_t chunk_seed = chunk_pos_seed(chunk_pos);
+    const float jitter_strength = ChunkMath::world_chunk_size(chunk_pos) * 0.01f;
+    uint32_t chunk_color_seed = hash_u32(chunk_seed ^ 0xa511e9b3u);
+    const Color chunk_color = hsv_to_rgb(rand01(chunk_color_seed), 0.75f, 0.95f);
+    uint32_t chunk_offset_seed = hash_u32(chunk_seed ^ 0x27d4eb2fu);
+    const Vector3 chunk_offset(
+        rand_signed(chunk_offset_seed) * jitter_strength,
+        rand_signed(chunk_offset_seed) * jitter_strength,
+        rand_signed(chunk_offset_seed) * jitter_strength
+    );
     for (size_t i = 0; i < points.size(); ++i) {
         const Vector3 global_pos = ChunkMath::vertices_to_world(chunk_pos, points[i]);
-        vertices[i] = global_pos - chunk_center;
+
+        vertices.set(static_cast<int>(i), global_pos - chunk_center + chunk_offset);
+        colors.set(static_cast<int>(i), chunk_color);
     }
 
     // Create arrays
     Array arrays;
     arrays.resize(Mesh::ARRAY_MAX);
     arrays[Mesh::ARRAY_VERTEX] = vertices;
+    arrays[Mesh::ARRAY_COLOR] = colors;
 
     // Add surface as point cloud
     point_mesh->add_surface_from_arrays(Mesh::PRIMITIVE_POINTS, arrays);
@@ -309,7 +352,8 @@ void ChunkClass::_build_debug_mesh_point() {
     Ref<StandardMaterial3D> point_material;
     point_material.instantiate();
     point_material->set_shading_mode(StandardMaterial3D::SHADING_MODE_UNSHADED);
-    point_material->set_albedo(Color(1.0f, 1.0f, 0.0f, 1.0f)); // Yellow for visibility
+    point_material->set_albedo(Color(1.0f, 1.0f, 1.0f, 1.0f));
+    point_material->set_flag(BaseMaterial3D::FLAG_ALBEDO_FROM_VERTEX_COLOR, true);
     point_material->set_flag(BaseMaterial3D::FLAG_USE_POINT_SIZE,true );
     point_material->set_point_size(15.0f); // Make points visible
     point_mesh_instance->set_material_override(point_material);
