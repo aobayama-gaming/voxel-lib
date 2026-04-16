@@ -13,7 +13,7 @@ int32_t ChunkMath::get_parent_from_child(int32_t coord, int &lod) {
         return 0; // If coord is 0, its parent is 0.
     }
 
-    lod = lsb_index; // The LOD is the index of the LSB.
+    lod = lsb_index+1; // The LOD is the index of the LSB. +1 because we are going to output the lod of parent
 
     // 2. "set to 0 the least importance"
     //    Create a mask to clear that one bit.

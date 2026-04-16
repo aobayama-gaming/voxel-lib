@@ -90,7 +90,7 @@ public:
 
             if (has(parent_pos)) {
                 chunk = get(parent_pos);
-                return actual_lod;
+                return actual_lod; //actual
             }
         };
 

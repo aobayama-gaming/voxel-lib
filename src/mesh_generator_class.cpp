@@ -678,11 +678,11 @@ void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,
             }
             
 
-            // const float margin = 0.1f;
+            const float margin = 0.1f;
 
-            // Vector3 min_bound = Vector3(x+margin, p_y_cell+margin, p_z_cell+margin);
-            // Vector3 max_bound = min_bound + Vector3(1.0f-margin, 1.0f-margin, 1.0f-margin);
-            // final_vertex = final_vertex.clamp(min_bound, max_bound);
+            Vector3 min_bound = Vector3(x+margin, p_y_cell+margin, p_z_cell+margin);
+            Vector3 max_bound = min_bound + Vector3(1.0f-margin, 1.0f-margin, 1.0f-margin);
+            final_vertex = final_vertex.clamp(min_bound, max_bound);
 
             //const Vector3 final_vertex = ChunkMath::world_to_vertices(chunk_id,mass_point*cell_size+mid_cell);
 
