@@ -242,3 +242,13 @@ Vector3i ChunkMath::world_to_chunk(Vector3 world_coord) {
 
 //     return (world_coord - chunk_min_corner) / vertex_step;
 // }
+
+bool ChunkMath::vertices_out_of_bound(Vector3 vertices_coord) {
+    // Check if vertices coordinate is out of bounds in any dimension.
+    // Valid range is [0, CHUNK_SIZE] in each dimension.
+    const float chunk_size = static_cast<float>(VoxelEngineConstants::CHUNK_SIZE);
+    
+    return vertices_coord.x < 0.0f || vertices_coord.x > chunk_size ||
+           vertices_coord.y < 0.0f || vertices_coord.y > chunk_size ||
+           vertices_coord.z < 0.0f || vertices_coord.z > chunk_size;
+}

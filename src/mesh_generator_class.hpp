@@ -183,13 +183,13 @@ struct VerticesData {
     EdgeCompute y_edge;
     EdgeCompute z_edge;
 
-    HashMap<Vector3i,Vector3*> edge_cache;
+    HashMap<Vector3i,int32_t> edge_cache;
 
     std::vector<Vector3> points;
     std::vector<uint32_t> vertices;
 
-    TypedArray<Vector3> outer_point;
-    TypedArray<int> outer_vertices;
+    HashMap<int32_t,Vector3> edge_displacement;
+
 
     void configure(int32_t p_width, int32_t p_height, int32_t p_depth) { // The size of this should one unit bigger (difference between center and corner)
         width = p_width;

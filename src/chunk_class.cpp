@@ -89,7 +89,7 @@ void ChunkClass::initialize(const Vector3i &p_chunk_pos, SDFBase *p_sdf) {
 
     mesh_info.initialize(chunk_pos, sdf);
     mesh_info.execute_on_self();
-    _build_chunk_mesh();
+    //_build_chunk_mesh();
     //_build_debug_mesh_point();
 
     state = ChunkState::OUTER_MESH;
@@ -107,10 +107,10 @@ void ChunkClass::_build_chunk_mesh() {
 
     const auto &points = mesh_info.vertices_data.points;
     const auto &raw_indices = mesh_info.vertices_data.vertices;
-    const auto &outer_points = mesh_info.vertices_data.outer_point;
-    const auto &outer_raw_indices = mesh_info.vertices_data.outer_vertices;
+    const auto &edge_displacement = mesh_info.vertices_data.edge_displacement;
 
-    if ((points.empty() || raw_indices.empty()) && (outer_points.is_empty() || outer_raw_indices.is_empty())) {
+
+    if ((points.empty() || raw_indices.empty()) ) {
         mesh_instance->set_mesh(Ref<ArrayMesh>());
         return;
     }
@@ -120,21 +120,25 @@ void ChunkClass::_build_chunk_mesh() {
     // 1. Gather all shared positions first (in local chunk space)
     PackedVector3Array shared_positions;
     const int base_vertex_count = static_cast<int>(points.size());
-    const int outer_vertex_count = outer_points.size();
-    shared_positions.resize(base_vertex_count + outer_vertex_count);
+    shared_positions.resize(base_vertex_count);
 
     for (size_t i = 0; i < points.size(); ++i) {
-        const Vector3 world_pos = ChunkMath::vertices_to_world(chunk_pos, points[i]);
+
+        Vector3 local_position = points[i];
+
+        if(edge_displacement.has(i))
+        {
+            local_position+=edge_displacement.get(i);
+        }
+
+        const Vector3 world_pos = ChunkMath::vertices_to_world(chunk_pos, local_position);
         shared_positions.set(static_cast<int>(i), world_pos - chunk_origin);
     }
 
-    for (int i = 0; i < outer_vertex_count; ++i) {
-        const Vector3 world_pos = outer_points[i];
-        shared_positions.set(base_vertex_count + i, world_pos - chunk_origin);
-    }
+
 
     // 2. Prepare flat arrays (Maximum possible size = number of raw indices)
-    const size_t max_indices = raw_indices.size() + outer_raw_indices.size();
+    const size_t max_indices = raw_indices.size() ;
     PackedVector3Array final_vertices;
     PackedVector3Array final_normals;
     PackedInt32Array final_indices;
@@ -210,14 +214,6 @@ void ChunkClass::_build_chunk_mesh() {
         );
     }
 
-    // 4. Process Outer/Patch triangles (offset by base_vertex_count)
-    for (int i = 0; i + 2 < outer_raw_indices.size(); i += 3) {
-        process_triangle(
-            base_vertex_count + static_cast<int>(outer_raw_indices[i]),
-            base_vertex_count + static_cast<int>(outer_raw_indices[i + 1]),
-            base_vertex_count + static_cast<int>(outer_raw_indices[i + 2])
-        );
-    }
 
     // 5. Shrink arrays to fit exactly the number of valid vertices produced
     if (current_vertex_idx == 0) {

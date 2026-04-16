@@ -27,4 +27,6 @@ namespace ChunkMath{
     
     float world_chunk_size(Vector3i chunk_coord);
     float world_chunk_spherical_radius(Vector3i chunk_coord);
+
+    bool vertices_out_of_bound(Vector3 vertices_coord);
 }

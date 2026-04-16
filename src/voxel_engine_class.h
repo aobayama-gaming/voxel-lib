@@ -92,7 +92,6 @@ public:
                 chunk = get(parent_pos);
                 return actual_lod;
             }
-            actual_lod++;
         };
 
         return -1; // Not found

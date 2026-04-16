@@ -965,12 +965,12 @@ void MeshBufferClass::cache_edge() {
 
                 const bool has_x0_in_trim = (x_start <= 0 && 0 < x_end);
                 if (has_x0_in_trim && _cell_has_point(0, y, z)) {
-                    vertices_data.edge_cache.insert(Vector3i(0, y, z), &vertices_data.points[point_index]);
+                    vertices_data.edge_cache.insert(Vector3i(0, y, z), point_index);
                 }
 
                 const bool has_xmax_in_trim = (x_start <= x_max && x_max < x_end);
                 if (has_xmax_in_trim && _cell_has_point(x_max, y, z)) {
-                    vertices_data.edge_cache.insert(Vector3i(x_max, y, z), &vertices_data.points[point_index-(row_points-1)]);
+                    vertices_data.edge_cache.insert(Vector3i(x_max, y, z), point_index-(row_points-1));
                 }
 
                 continue;
@@ -988,7 +988,7 @@ void MeshBufferClass::cache_edge() {
                     continue;
                 }
 
-                vertices_data.edge_cache.insert(Vector3i(x, y, z), &vertices_data.points[point_index]);
+                vertices_data.edge_cache.insert(Vector3i(x, y, z), point_index);
                 point_index--;
             }
         }
