@@ -8,7 +8,7 @@ public:
     SDFDummy() = default;
     ~SDFDummy() override = default;
     
-    // plane
+    //plane
     // float evaluate(const Vector3 &p_world_pos) const override {
     //     return -p_world_pos.y - 1.0f;
     // }

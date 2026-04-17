@@ -101,12 +101,12 @@ void VoxelEngineClass::_ready() {
         //     value *= phi;
         // }
         // Configuration
-        const int lod_levels = 5;
+        const int lod_levels = 15;
 
         // LOD thresholds are stored in chunk-coordinate units because the scan
         // logic compares them against chunk-space distances.
         // Keep LOD0 until one base voxel is about ~1 pixel on screen.
-        const float target_pixel_error = 15.0f; // acceptable projected geometric error in pixels
+        const float target_pixel_error = 25.0f; // acceptable projected geometric error in pixels
         const float viewport_height = 1080.0f;
         const float fov_rad = 75.0f * (3.14159265f / 180.0f);
         const float focal_length = viewport_height / (2.0f * std::tan(fov_rad * 0.5f));
@@ -153,7 +153,7 @@ void VoxelEngineClass::_ready() {
     SDFBase *sdf = memnew(SDFDummy);
     set_sdf(sdf);
 
-    center_chunk = Vector3i(-9, 5, -1);
+    center_chunk = Vector3i(1, 1, 1);
     run_chunk_pipeline();
 }
 
@@ -337,14 +337,14 @@ void VoxelEngineClass::load_chunks() {
     }
 
     // // Patch all currently loaded chunks, then rebuild their mesh with outer patch data.
-    for (const Vector3i &chunk_pos : loaded_chunks) {
-        ChunkClass **chunk_ptr = chunks.getptr(chunk_pos);
-        if (!chunk_ptr || !*chunk_ptr) {
-            continue;
-        }
+    // for (const Vector3i &chunk_pos : loaded_chunks) {
+    //     ChunkClass **chunk_ptr = chunks.getptr(chunk_pos);
+    //     if (!chunk_ptr || !*chunk_ptr) {
+    //         continue;
+    //     }
 
-        chunk_patching(**chunk_ptr);
-    }
+    //     chunk_patching(**chunk_ptr);
+    // }
 
     for (const Vector3i &chunk_pos : loaded_chunks) {
         ChunkClass **chunk_ptr = chunks.getptr(chunk_pos);

@@ -8,33 +8,42 @@ inline constexpr int BINARY_SEARCH_STEP =7;
 
 namespace {
 
-float skirt_offset(float x,float y, float z, float value){
-    auto calculate_offset = [](float coord) {
-        float dist_from_min = coord;
-        float dist_from_max = static_cast<float>(VoxelEngineConstants::CHUNK_SIZE) - coord;
+float skirt_offset(float x,float y, float z, float value,float size){
+
+    auto calculate_offset = [](float coord,float size) {
+        const float dist_from_min = coord;
+        const float dist_from_max = static_cast<float>(VoxelEngineConstants::CHUNK_SIZE) - coord;
+        const float nearest_edge_dist = MIN(dist_from_min, dist_from_max);
+
+        const float skirt_size = static_cast<float>(VoxelEngineConstants::SKIRT_SIZE) / 2.25f;
+        const float extended_slope_limit = static_cast<float>(VoxelEngineConstants::SKIRT_SIZE) * 2.f;
+        const float micro_slope_amplitude = 0.01f;
 
         float offset = 0.0f;
-        float skirt_size = static_cast<float>(VoxelEngineConstants::SKIRT_SIZE)/2;
 
-        if (dist_from_min < skirt_size) {
-            offset = 1.0f - (dist_from_min / skirt_size);
-        } else if (dist_from_max < skirt_size) {
-            offset = 1.0f - (dist_from_max / skirt_size);
+        if (nearest_edge_dist < skirt_size) {
+            offset = 1.0f - (nearest_edge_dist / skirt_size);
         }
-        return offset;
+
+        if (nearest_edge_dist < extended_slope_limit) {
+            const float t = 1.0f - (nearest_edge_dist / extended_slope_limit);
+            offset += micro_slope_amplitude * t;
+        }
+
+        return offset*size;
     };
 
-    float offset_x = calculate_offset(x);
-    float offset_y = calculate_offset(y);
-    float offset_z = calculate_offset(z);
+    float offset_x = calculate_offset(x,size);
+    float offset_y = calculate_offset(y,size);
+    float offset_z = calculate_offset(z,size);
 
     float max_offset = fmax(offset_x, fmax(offset_y, offset_z));
 
     return value - max_offset;
 }
 
-float skirt_offset(Vector3 pos,float value){
-    return skirt_offset(pos.x,pos.y,pos.z,value);
+float skirt_offset(Vector3 pos,float value,float size){
+    return skirt_offset(pos.x,pos.y,pos.z,value,size);
 }
 
 // float skirt_offset(Vector3i pos,float value){
@@ -121,13 +130,15 @@ void MeshBufferClass::first_pass(const int32_t p_y_edge,const int32_t p_z_edge){
 
     bool first_change = true;
 
+    const float size = (1<<ChunkMath::get_lod(chunk_id));
+
     for(int32_t x=0;x<=vertices_data.width;x++){
 
         const Vector3i vertices_coordinates =  Vector3i(x,p_y_edge,p_z_edge);
 
         const Vector3 evaluation_vector = ChunkMath::vertices_to_world(chunk_id , vertices_coordinates);
 
-        float_t actual_value = skirt_offset(vertices_coordinates, sdf->evaluate(evaluation_vector));
+        float_t actual_value = skirt_offset(vertices_coordinates, sdf->evaluate(evaluation_vector),size);
 
         if(x>0){
 
@@ -388,6 +399,8 @@ void MeshBufferClass::_find_edge_intersection(const Vector3i &start_point, const
     if(edge_case==1 || edge_case==2){
         
 
+        const float chunk_size=1<< ChunkMath::get_lod( chunk_id);
+
         bool left = edge_case & 0b01u;
         bool right = (edge_case & 0b10u) >> 1;
 
@@ -400,7 +413,7 @@ void MeshBufferClass::_find_edge_intersection(const Vector3i &start_point, const
 
             const Vector3 evaluation_vector = ChunkMath::vertices_to_world(chunk_id,mid_vector);
 
-            const bool mid = skirt_offset(mid_vector, sdf->evaluate(evaluation_vector))< 0.0f;
+            const bool mid = skirt_offset(mid_vector, sdf->evaluate(evaluation_vector),chunk_size)< 0.0f;
 
             if(left==mid){
                 left_vector=mid_vector;

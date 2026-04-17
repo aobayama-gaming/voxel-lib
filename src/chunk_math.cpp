@@ -13,7 +13,7 @@ int32_t ChunkMath::get_parent_from_child(int32_t coord, int &lod) {
         return 0; // If coord is 0, its parent is 0.
     }
 
-    lod = lsb_index+1; // The LOD is the index of the LSB. +1 because we are going to output the lod of parent
+    lod = lsb_index; // The LOD is the index of the LSB. +1 because we are going to output the lod of parent
 
     // 2. "set to 0 the least importance"
     //    Create a mask to clear that one bit.
@@ -127,16 +127,18 @@ float _direct_transform(float inputValue,float chunk_dim){
 
 
     const float CHUNK_SIZE = static_cast<float>(VoxelEngineConstants::CHUNK_SIZE-VoxelEngineConstants::SKIRT_SIZE*2);
-
-    return  (inputValue-VoxelEngineConstants::SKIRT_SIZE*2+0.5f)*chunk_dim/CHUNK_SIZE;
+    //const float CHUNK_SIZE = static_cast<float>(VoxelEngineConstants::CHUNK_SIZE);
+    //return  (inputValue)*chunk_dim/CHUNK_SIZE;
+    return  (inputValue-VoxelEngineConstants::SKIRT_SIZE)*chunk_dim/CHUNK_SIZE;
 
 }
 
 float _inverse_transform(float inputValue,float chunk_dim){
 
     const float CHUNK_SIZE = static_cast<float>(VoxelEngineConstants::CHUNK_SIZE-VoxelEngineConstants::SKIRT_SIZE*2);
-
-    return inputValue*CHUNK_SIZE/chunk_dim+VoxelEngineConstants::SKIRT_SIZE*2-0.5f;
+    //const float CHUNK_SIZE = static_cast<float>(VoxelEngineConstants::CHUNK_SIZE);
+    //return inputValue*CHUNK_SIZE/chunk_dim;
+    return inputValue*CHUNK_SIZE/chunk_dim+VoxelEngineConstants::SKIRT_SIZE;
 
 }
 

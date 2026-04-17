@@ -109,8 +109,7 @@ void ChunkClass::_build_chunk_mesh() {
     const auto &raw_indices = mesh_info.vertices_data.vertices;
     const auto &edge_displacement = mesh_info.vertices_data.edge_displacement;
 
-
-    if ((points.empty() || raw_indices.empty()) ) {
+    if (points.empty() || raw_indices.empty()) {
         mesh_instance->set_mesh(Ref<ArrayMesh>());
         return;
     }
@@ -123,43 +122,39 @@ void ChunkClass::_build_chunk_mesh() {
     shared_positions.resize(base_vertex_count);
 
     for (size_t i = 0; i < points.size(); ++i) {
-
         Vector3 local_position = points[i];
 
-        if(edge_displacement.has(i))
-        {
-            local_position+=edge_displacement.get(i);
+        if (edge_displacement.has(i)) {
+            local_position += edge_displacement.get(i);
         }
 
         const Vector3 world_pos = ChunkMath::vertices_to_world(chunk_pos, local_position);
         shared_positions.set(static_cast<int>(i), world_pos - chunk_origin);
     }
 
-
-
-    // 2. Prepare flat arrays (Maximum possible size = number of raw indices)
-    const size_t max_indices = raw_indices.size() ;
+    // 2. Prepare flat arrays
+    const size_t max_indices = raw_indices.size();
     PackedVector3Array final_vertices;
     PackedVector3Array final_normals;
+    PackedColorArray final_colors;
     PackedInt32Array final_indices;
     
     final_vertices.resize(max_indices);
     final_normals.resize(max_indices);
+    final_colors.resize(max_indices);
     final_indices.resize(max_indices);
     
     int current_vertex_idx = 0;
     constexpr float min_area_sq = 1e-12f;
-    const float normal_inset = 0.01f; // 5% inset toward triangle midpoint
+    const float normal_inset = 0.05f; // Changed from 0.01 to 0.05 to match your 5% comment
 
     // Lambda to process a single triangle, duplicate points, and calculate inset normals
     auto process_triangle = [&](int idx_a, int idx_b, int idx_c) {
-        // if (idx_a < 0 || idx_b < 0 || idx_c < 0 || 
-        //     idx_a >= shared_positions.size() || idx_b >= shared_positions.size() || idx_c >= shared_positions.size()) {
-        //     return;
-        // }
-        // if (idx_a == idx_b || idx_b == idx_c || idx_c == idx_a) {
-        //     return;
-        // }
+        // Safety bounds check
+        if (idx_a < 0 || idx_b < 0 || idx_c < 0 || 
+            idx_a >= shared_positions.size() || idx_b >= shared_positions.size() || idx_c >= shared_positions.size()) {
+            return;
+        }
 
         const Vector3 va = shared_positions[idx_a];
         const Vector3 vb = shared_positions[idx_b];
@@ -167,13 +162,22 @@ void ChunkClass::_build_chunk_mesh() {
         
         // Calculate raw geometric face normal
         const Vector3 face_normal_cross = (vb - va).cross(vc - va);
-        // if (face_normal_cross.length_squared() <= min_area_sq) {
-        //     return; // Degenerate triangle
-        // }
+        
+        // FIX 3: UNCOMMENTED! Prevent degenerate triangles that cause NaN normals
+        if (face_normal_cross.length_squared() <= min_area_sq) {
+            return; 
+        }
         const Vector3 geometric_normal = face_normal_cross.normalized();
 
         // Calculate triangle midpoint (centroid) in local space
         const Vector3 centroid = (va + vb + vc) / 3.0f;
+        
+        // FIX 2: Evaluate the checker pattern ONCE per triangle in WORLD space
+        const Vector3 world_centroid = centroid + chunk_origin;
+        const int checker = (static_cast<int>(std::floor(world_centroid.x * 2.0f)) + 
+                             static_cast<int>(std::floor(world_centroid.y * 2.0f)) + 
+                             static_cast<int>(std::floor(world_centroid.z * 2.0f))) & 1;
+        const Color face_color = checker == 0 ? Color(0.15f, 0.15f, 0.15f, 1.0f) : Color(0.85f, 0.85f, 0.85f, 1.0f);
 
         const Vector3 tri_verts[3] = {va, vb, vc};
 
@@ -199,6 +203,7 @@ void ChunkClass::_build_chunk_mesh() {
 
             final_vertices.set(current_vertex_idx, v);
             final_normals.set(current_vertex_idx, n);
+            final_colors.set(current_vertex_idx, face_color); // Use unified triangle color
             final_indices.set(current_vertex_idx, current_vertex_idx); // 1:1 mapping
             
             current_vertex_idx++;
@@ -214,7 +219,6 @@ void ChunkClass::_build_chunk_mesh() {
         );
     }
 
-
     // 5. Shrink arrays to fit exactly the number of valid vertices produced
     if (current_vertex_idx == 0) {
         mesh_instance->set_mesh(Ref<ArrayMesh>());
@@ -223,6 +227,7 @@ void ChunkClass::_build_chunk_mesh() {
 
     final_vertices.resize(current_vertex_idx);
     final_normals.resize(current_vertex_idx);
+    final_colors.resize(current_vertex_idx);
     final_indices.resize(current_vertex_idx);
 
     // 6. Build the Godot ArrayMesh
@@ -230,6 +235,7 @@ void ChunkClass::_build_chunk_mesh() {
     arrays.resize(Mesh::ARRAY_MAX);
     arrays[Mesh::ARRAY_VERTEX] = final_vertices;
     arrays[Mesh::ARRAY_NORMAL] = final_normals;
+    arrays[Mesh::ARRAY_COLOR] = final_colors;
     arrays[Mesh::ARRAY_INDEX] = final_indices;
 
     Ref<ArrayMesh> chunk_mesh;
@@ -237,12 +243,17 @@ void ChunkClass::_build_chunk_mesh() {
     chunk_mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);
     mesh_instance->set_mesh(chunk_mesh);
 
-    Ref<StandardMaterial3D> surface_material;
-    surface_material.instantiate();
+    Ref<StandardMaterial3D> surface_material = mesh_instance->get_material_override();
+    if (surface_material.is_null()) {
+        surface_material.instantiate();
+        mesh_instance->set_material_override(surface_material);
+    }
+
+    // Keep checkerboard from vertex colors, but use standard lit shading.
     surface_material->set_shading_mode(StandardMaterial3D::SHADING_MODE_PER_PIXEL);
+    surface_material->set_flag(BaseMaterial3D::FLAG_ALBEDO_FROM_VERTEX_COLOR, true);
     surface_material->set_roughness(1.0f);
     surface_material->set_metallic(0.0f);
-    mesh_instance->set_material_override(surface_material);
 }
 
 void ChunkClass::_build_debug_mesh() {
