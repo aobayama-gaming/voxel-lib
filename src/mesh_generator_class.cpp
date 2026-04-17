@@ -8,6 +8,39 @@ inline constexpr int BINARY_SEARCH_STEP =7;
 
 namespace {
 
+float skirt_offset(float x,float y, float z, float value){
+    auto calculate_offset = [](float coord) {
+        float dist_from_min = coord;
+        float dist_from_max = static_cast<float>(VoxelEngineConstants::CHUNK_SIZE) - coord;
+
+        float offset = 0.0f;
+        float skirt_size = static_cast<float>(VoxelEngineConstants::SKIRT_SIZE)/2;
+
+        if (dist_from_min < skirt_size) {
+            offset = 1.0f - (dist_from_min / skirt_size);
+        } else if (dist_from_max < skirt_size) {
+            offset = 1.0f - (dist_from_max / skirt_size);
+        }
+        return offset;
+    };
+
+    float offset_x = calculate_offset(x);
+    float offset_y = calculate_offset(y);
+    float offset_z = calculate_offset(z);
+
+    float max_offset = fmax(offset_x, fmax(offset_y, offset_z));
+
+    return value - max_offset;
+}
+
+float skirt_offset(Vector3 pos,float value){
+    return skirt_offset(pos.x,pos.y,pos.z,value);
+}
+
+// float skirt_offset(Vector3i pos,float value){
+//     return skirt_offset(pos,value);
+// }
+
 bool solve_linear_system_3x3(const Basis &a, const Vector3 &b, Vector3 &x) {
     // Augmented matrix [A|b] solved with partial pivoting.
     double m[3][4] = {
@@ -94,7 +127,7 @@ void MeshBufferClass::first_pass(const int32_t p_y_edge,const int32_t p_z_edge){
 
         const Vector3 evaluation_vector = ChunkMath::vertices_to_world(chunk_id , vertices_coordinates);
 
-        float_t actual_value = sdf->evaluate(ChunkMath::vertices_to_world(chunk_id , vertices_coordinates));
+        float_t actual_value = skirt_offset(vertices_coordinates, sdf->evaluate(evaluation_vector));
 
         if(x>0){
 
@@ -365,7 +398,9 @@ void MeshBufferClass::_find_edge_intersection(const Vector3i &start_point, const
 
         for(int i=0;i<BINARY_SEARCH_STEP;i++){
 
-            const bool mid = sdf->evaluate(ChunkMath::vertices_to_world(chunk_id,mid_vector))< 0.0f;
+            const Vector3 evaluation_vector = ChunkMath::vertices_to_world(chunk_id,mid_vector);
+
+            const bool mid = skirt_offset(mid_vector, sdf->evaluate(evaluation_vector))< 0.0f;
 
             if(left==mid){
                 left_vector=mid_vector;

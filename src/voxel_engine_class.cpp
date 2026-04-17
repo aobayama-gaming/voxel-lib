@@ -551,7 +551,7 @@ void VoxelEngineClass::chunk_patching(ChunkClass &chunk){
         }
 
         if(distance>-1){
-            vertices_data.edge_displacement.insert(edge_index,edge_displacement);
+            //vertices_data.edge_displacement.insert(edge_index,edge_displacement);
         }
 
     }

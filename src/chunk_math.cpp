@@ -126,17 +126,17 @@ void mapRange(float value, float inMin, float inMax, float outMin, float outMax,
 float _direct_transform(float inputValue,float chunk_dim){
 
 
-    const float CHUNK_SIZE = static_cast<float>(VoxelEngineConstants::CHUNK_SIZE-1.0f);
+    const float CHUNK_SIZE = static_cast<float>(VoxelEngineConstants::CHUNK_SIZE-VoxelEngineConstants::SKIRT_SIZE*2);
 
-    return  (inputValue)*chunk_dim/CHUNK_SIZE;
+    return  (inputValue-VoxelEngineConstants::SKIRT_SIZE*2+0.5f)*chunk_dim/CHUNK_SIZE;
 
 }
 
 float _inverse_transform(float inputValue,float chunk_dim){
 
-    const float CHUNK_SIZE = static_cast<float>(VoxelEngineConstants::CHUNK_SIZE-1.0f);
+    const float CHUNK_SIZE = static_cast<float>(VoxelEngineConstants::CHUNK_SIZE-VoxelEngineConstants::SKIRT_SIZE*2);
 
-    return inputValue*CHUNK_SIZE/chunk_dim;
+    return inputValue*CHUNK_SIZE/chunk_dim+VoxelEngineConstants::SKIRT_SIZE*2-0.5f;
 
 }
 
