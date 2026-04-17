@@ -3,7 +3,7 @@
 namespace VoxelEngineConstants {
     // Can be modified later, define the chunk size.
     inline constexpr int CHUNK_SIZE = 32; // 8x8x8 voxels per chunk.
-    inline constexpr float VOXEL_SIZE = 0.1f; // Each voxel is 10cm in size.
+    inline constexpr float VOXEL_SIZE = 0.5f; // Each voxel is 10cm in size.
 
     inline constexpr int SKIRT_SIZE = 2;
 

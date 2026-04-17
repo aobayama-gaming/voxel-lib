@@ -115,6 +115,7 @@ void ChunkClass::_build_chunk_mesh() {
     }
 
     const Vector3 chunk_origin = ChunkMath::chunk_to_world(chunk_pos);
+    const Color lod_color = lod_to_color(ChunkMath::get_lod(chunk_pos));
 
     // 1. Gather all shared positions first (in local chunk space)
     PackedVector3Array shared_positions;
@@ -177,7 +178,14 @@ void ChunkClass::_build_chunk_mesh() {
         const int checker = (static_cast<int>(std::floor(world_centroid.x * 2.0f)) + 
                              static_cast<int>(std::floor(world_centroid.y * 2.0f)) + 
                              static_cast<int>(std::floor(world_centroid.z * 2.0f))) & 1;
-        const Color face_color = checker == 0 ? Color(0.15f, 0.15f, 0.15f, 1.0f) : Color(0.85f, 0.85f, 0.85f, 1.0f);
+        const Color dark_lod_tint = Color(lod_color.r * 0.35f, lod_color.g * 0.35f, lod_color.b * 0.35f, 1.0f);
+        const Color light_lod_tint = Color(
+            MIN(lod_color.r * 1.15f, 1.0f),
+            MIN(lod_color.g * 1.15f, 1.0f),
+            MIN(lod_color.b * 1.15f, 1.0f),
+            1.0f
+        );
+        const Color face_color = checker == 0 ? dark_lod_tint : light_lod_tint;
 
         const Vector3 tri_verts[3] = {va, vb, vc};
 

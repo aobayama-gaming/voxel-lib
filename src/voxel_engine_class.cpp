@@ -101,12 +101,12 @@ void VoxelEngineClass::_ready() {
         //     value *= phi;
         // }
         // Configuration
-        const int lod_levels = 15;
+        const int lod_levels = 4;
 
         // LOD thresholds are stored in chunk-coordinate units because the scan
         // logic compares them against chunk-space distances.
         // Keep LOD0 until one base voxel is about ~1 pixel on screen.
-        const float target_pixel_error = 25.0f; // acceptable projected geometric error in pixels
+        const float target_pixel_error = 12.0f; // acceptable projected geometric error in pixels
         const float viewport_height = 1080.0f;
         const float fov_rad = 75.0f * (3.14159265f / 180.0f);
         const float focal_length = viewport_height / (2.0f * std::tan(fov_rad * 0.5f));
@@ -153,7 +153,8 @@ void VoxelEngineClass::_ready() {
     SDFBase *sdf = memnew(SDFDummy);
     set_sdf(sdf);
 
-    center_chunk = Vector3i(1, 1, 1);
+    //center_chunk = Vector3i(-19, 41, -21);
+    center_chunk = Vector3i(-1, 1, -1);
     run_chunk_pipeline();
 }
 
@@ -331,10 +332,10 @@ void VoxelEngineClass::load_chunks() {
         chunks_to_load_by_lod[lod].clear();
     }
 
-    print_line(vformat("Loaded chunk positions (%d):", loaded_chunks.size()));
-    for (const Vector3i &chunk_pos : loaded_chunks) {
-        print_line(vformat(" - %s", chunk_pos));
-    }
+    // print_line(vformat("Loaded chunk positions (%d):", loaded_chunks.size()));
+    // for (const Vector3i &chunk_pos : loaded_chunks) {
+    //     print_line(vformat(" - %s", chunk_pos));
+    // }
 
     // // Patch all currently loaded chunks, then rebuild their mesh with outer patch data.
     // for (const Vector3i &chunk_pos : loaded_chunks) {
@@ -367,195 +368,3 @@ void VoxelEngineClass::run_chunk_pipeline() {
     load_chunks();
 }
 
-void VoxelEngineClass::chunk_patching(ChunkClass &chunk){
-    /*
-    Chunk patching evaluates external edges of the chunk. 
-    If the edge is changed, we grab the 4 surrounding dual points (from the chunk and its neighbors).
-    - If any neighbor has a larger LOD, we patch toward them to seal the gap.
-    - If the neighbors are equal LOD, we only patch on the positive faces to prevent duplicating quads.
-    - An outer_point_cache maps world coordinates to indices to reuse dual points cleanly.
-    */
-    
-    auto& vertices_data = chunk.mesh_info.vertices_data;
-
-    //clear past displacement
-    vertices_data.edge_displacement.clear();
-
-    
-
-    const Vector3i chunk_id = chunk.chunk_pos;
-    const int32_t chunk_lod =ChunkMath::get_lod(chunk_id);
-    const int32_t chunk_size = 1 << chunk_lod;
-
-    if(chunk_id == Vector3i(-1, -1, 5)){
-        print_line("lol");
-    }
-
-    ChunkClass *neighbors[26] = {nullptr};
-    int32_t max_lod = -1;
-
-    for(int i=0;i<27;i++){
-
-        if(i==13){
-            continue;
-        }
-
-        const int x_offset = i%3 -1;
-        const int y_offset = (i/3)%3 -1;
-        const int z_offset = (i/9)%3 -1;
-
-        const int i_offset = i - (i>13);
-
-        const Vector3i neighbor_coordinate = Vector3i(
-            chunk_id.x+x_offset*2*chunk_size,
-            chunk_id.y+y_offset*2*chunk_size,
-            chunk_id.z+z_offset*2*chunk_size
-        );
-
-        // if(neighbor_coordinate==Vector3i(-3,-3,3) && chunk_id == Vector3i(-1, -1, 5)){
-        //     print_line("test");
-        // }
-
-        const int neighbor_lod = chunks.get_chunk(neighbor_coordinate,neighbors[i_offset]);
-
-
-        if(neighbor_lod == -1){
-            continue;
-        }
-        // erase pointer if same size
-        // if(neighbor_lod == chunk_lod){
-        //     neighbors[i_offset] = nullptr;
-        // }
-
-        max_lod = MAX(neighbor_lod,max_lod);
-
-    }
-
-    if(max_lod <= chunk_lod){
-        return;
-    }
-
-
-    
-
-    for(const KeyValue<Vector3i, int32_t> &E : vertices_data.edge_cache){
-
-        const int32_t edge_index = E.value;
-
-        const Vector3 edge_position = vertices_data.points[edge_index];
-
-        const Vector3 world_edge = ChunkMath::vertices_to_world(chunk_id,edge_position);
-
-        const Vector3 mid_edge = edge_position.floor()+Vector3(0.5f,0.5f,0.5f);
-
-        int32_t local_max_lod = -1;
-
-        float distance = -1.0f;
-        Vector3 edge_displacement = Vector3();
-
-        for(int i=0; i<26;i++){
-
-            if(neighbors[i]==nullptr){
-                continue;
-            }
-
-            auto& neighbor_vertices_data = neighbors[i]->mesh_info.vertices_data;
-            auto& neighbor_chunk_id = neighbors[i]->mesh_info.chunk_id;
-
-            const int neighbor_lod = ChunkMath::get_lod(neighbor_chunk_id);
-
-
-            const Vector3 local_position = ChunkMath::world_to_vertices(neighbor_chunk_id,ChunkMath::vertices_to_world(chunk_id,edge_position));
-
-            if(ChunkMath::vertices_out_of_bound(local_position.floor())){
-                continue;
-            }
-
-            if(!neighbor_vertices_data.edge_cache.has(local_position.floor())){
-                continue;
-            }
-
-            if(neighbor_lod<local_max_lod){
-                continue;
-            }
-
-            //easy
-            const int neighbor_edge_index = neighbor_vertices_data.edge_cache.get(local_position.floor());
-
-            Vector3 edge_displacement_temp = neighbor_vertices_data.points[neighbor_edge_index];
-
-            edge_displacement_temp = ChunkMath::vertices_to_world(neighbor_chunk_id,edge_displacement_temp);
-
-            edge_displacement_temp = ChunkMath::world_to_vertices(chunk_id,edge_displacement_temp);
-
-            edge_displacement_temp = edge_displacement_temp - edge_position;
-
-            const float new_distance = edge_displacement_temp.length();
-
-            if(distance == -1 || new_distance<distance){
-                distance = new_distance;
-                edge_displacement = edge_displacement_temp;
-                local_max_lod = neighbor_lod;
-            }
-
-            //complex
-
-            // float local_distance = -1;
-            // Vector3 local_edge_displacement = Vector3();
-
-            // for(int j=0;j<27;j++){
-
-            // const int x_offset = j%3 -1;
-            // const int y_offset = (j/3)%3 -1;
-            // const int z_offset = (j/9)%3 -1;
-
-            // const Vector3 local_translated = Vector3(
-            //     local_position.x+x_offset,
-            //     local_position.y+y_offset,
-            //     local_position.z+z_offset
-            // );
-
-            // if(ChunkMath::vertices_out_of_bound(local_translated)){
-            //     continue;
-            // }
-
-            // if(!neighbor_vertices_data.edge_cache.has(local_translated.floor())){
-            //     continue;
-            // }
-
-            // const int neighbor_edge_index = neighbor_vertices_data.edge_cache.get(local_translated.floor());
-
-            // Vector3 edge_displacement_temp = neighbor_vertices_data.points[neighbor_edge_index];
-
-            // edge_displacement_temp = ChunkMath::vertices_to_world(neighbor_chunk_id,edge_displacement_temp);
-
-            // edge_displacement_temp = ChunkMath::world_to_vertices(chunk_id,edge_displacement_temp);
-
-            // edge_displacement_temp = edge_displacement_temp - edge_position;
-
-            // const float new_distance = edge_displacement_temp.length();
-
-            // if(local_distance == -1 || new_distance<local_distance){
-            //     local_distance = new_distance;
-            //     local_edge_displacement = edge_displacement_temp;
-            //     local_max_lod = neighbor_lod;
-            // }
-
-            // }
-
-            // if(local_distance>-1 && (distance==-1||local_distance<distance)){
-            //     distance =local_distance;
-            //     edge_displacement = local_edge_displacement;
-            // }
-
-        }
-
-        if(distance>-1){
-            //vertices_data.edge_displacement.insert(edge_index,edge_displacement);
-        }
-
-    }
-
-
-
-}

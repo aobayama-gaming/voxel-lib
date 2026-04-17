@@ -31,7 +31,7 @@ public:
     float evaluate(const Vector3 &p_world_pos) const override {
         const float wave_x = std::sin(p_world_pos.x * 1.5f);
         const float wave_z = std::sin(p_world_pos.z * 1.2f);
-        const float terrain = -p_world_pos.y + (wave_x + wave_z);
+        const float terrain = - p_world_pos.y + (wave_x + wave_z);
 
         const float period = 6.0f;
         const Vector3 half_size(1.45f, 1.45f, 1.45f);
