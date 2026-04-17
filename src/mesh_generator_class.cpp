@@ -755,8 +755,8 @@ void MeshBufferClass::fifth_pass(const int32_t p_y_qcell, const int32_t p_z_qcel
     uint32_t x_edge_counter = vertices_data.metadata.cum(y + 1, z + 1).x_edge - 1;
     uint32_t y_edge_counter = vertices_data.metadata.cum(y + 1, z + 1).y_edge - 1;
     uint32_t z_edge_counter = vertices_data.metadata.cum(y + 1, z + 1).z_edge - 1;
-    // uint32_t y_far_edge_counter = vertices_data.metadata.cum(y, z + 1).y_edge - 1;
-    // uint32_t z_far_edge_counter = vertices_data.metadata.cum(y + 1, z).z_edge - 1;
+    uint32_t y_far_edge_counter = vertices_data.metadata.cum(y, z + 1).y_edge - 1;
+    uint32_t z_far_edge_counter = vertices_data.metadata.cum(y + 1, z).z_edge - 1;
 
     // Memory buffer indexing for the previous iteration
     uint32_t prev_x_idx_00 = 0, prev_x_idx_10 = 0, prev_x_idx_01 = 0, prev_x_idx_11 = 0;
@@ -813,28 +813,28 @@ void MeshBufferClass::fifth_pass(const int32_t p_y_qcell, const int32_t p_z_qcel
         if (v01) pt_01--;
         if (v11) pt_11--;
 
+        uint32_t case_x = vertices_data.x_edge_cases(x, y + 1, z + 1);
+        bool x_changed = MeshEdgeUtils::edge_change(case_x);
+
+        if (x_changed) {
+            bool positive = (case_x == 1);
+            
+            // X-edge Quad indices (using the IDs of the 4 surrounding cells on the YZ plane)
+            uint32_t idA = cur_idx_00;
+            uint32_t idB = cur_idx_10;
+            uint32_t idC = cur_idx_11;
+            uint32_t idD = cur_idx_01;
+
+            uint32_t write_idx = x_edge_counter * 6;
+
+            write_quad(write_idx, positive, idA, idB, idC, idD);
+            x_edge_counter--;
+        }
 
 
         // Generate Y & Z Edge Quads mapping cells behind it
         if (x > 0) {
 
-            uint32_t case_x = vertices_data.x_edge_cases(x, y + 1, z + 1);
-            bool x_changed = MeshEdgeUtils::edge_change(case_x);
-
-            if (x_changed) {
-                bool positive = (case_x == 1);
-                
-                // X-edge Quad indices (using the IDs of the 4 surrounding cells on the YZ plane)
-                uint32_t idA = cur_idx_00;
-                uint32_t idB = cur_idx_10;
-                uint32_t idC = cur_idx_11;
-                uint32_t idD = cur_idx_01;
-
-                uint32_t write_idx = x_edge_counter * 6;
-
-                write_quad(write_idx, positive, idA, idB, idC, idD);
-                x_edge_counter--;
-            }
 
             uint32_t case_y = vertices_data.x_edge_cases(x, y + 2, z + 1);
             bool y_changed = MeshEdgeUtils::transversal_change(case_x, case_y, true);
@@ -854,23 +854,23 @@ void MeshBufferClass::fifth_pass(const int32_t p_y_qcell, const int32_t p_z_qcel
                 y_edge_counter--;
             }
 
-            // if(y==0){
-            //     uint32_t case_y_far = vertices_data.x_edge_cases(x, y , z + 1);
-            //     bool y_far_changed = MeshEdgeUtils::transversal_change(case_y_far,case_x, true);
-            //     if(y_far_changed){
+            if(y==0){
+                uint32_t case_y_far = vertices_data.x_edge_cases(x, y , z + 1);
+                bool y_far_changed = MeshEdgeUtils::transversal_change(case_y_far,case_x, true);
+                if(y_far_changed){
 
-            //     uint32_t idA = prev_x_idx_00;
-            //     uint32_t idB = cur_idx_00;
-            //     uint32_t idC = cur_idx_01;
-            //     uint32_t idD = prev_x_idx_01;
-            //     bool positive = (MeshEdgeUtils::transversal_combination(case_y_far,case_x, true) == 1);
-            //     uint32_t write_idx = (y_offset + y_far_edge_counter) * 6;
+                uint32_t idA = prev_x_idx_00;
+                uint32_t idB = cur_idx_00;
+                uint32_t idC = cur_idx_01;
+                uint32_t idD = prev_x_idx_01;
+                bool positive = (MeshEdgeUtils::transversal_combination(case_y_far,case_x, true) == 1);
+                uint32_t write_idx = (y_offset + y_far_edge_counter) * 6;
 
-            //     // Keep the previous Y-edge winding convention.
-            //     write_quad(write_idx, !positive, idA, idB, idC, idD);
-            //     y_far_edge_counter--;
-            //     }
-            // }
+                // Keep the previous Y-edge winding convention.
+                write_quad(write_idx, !positive, idA, idB, idC, idD);
+                y_far_edge_counter--;
+                }
+            }
 
             uint32_t case_z = vertices_data.x_edge_cases(x, y + 1, z + 2);
             bool z_changed = MeshEdgeUtils::transversal_change(case_x, case_z, true);
@@ -889,23 +889,23 @@ void MeshBufferClass::fifth_pass(const int32_t p_y_qcell, const int32_t p_z_qcel
                 z_edge_counter--;
             }
 
-            // if(z==0){
-            //     uint32_t case_z_far = vertices_data.x_edge_cases(x, y +1 , z);
-            //     bool z_far_changed = MeshEdgeUtils::transversal_change(case_z_far,case_x, true);
-            //     if(z_far_changed){
+            if(z==0){
+                uint32_t case_z_far = vertices_data.x_edge_cases(x, y +1 , z);
+                bool z_far_changed = MeshEdgeUtils::transversal_change(case_z_far,case_x, true);
+                if(z_far_changed){
 
-            //     uint32_t idA = prev_x_idx_00;
-            //     uint32_t idB = cur_idx_00;
-            //     uint32_t idC = cur_idx_10;
-            //     uint32_t idD = prev_x_idx_10;
-            //     bool positive = (MeshEdgeUtils::transversal_combination(case_z_far,case_x, true) == 1);
-            //     uint32_t write_idx = (z_offset + z_far_edge_counter) * 6;
+                uint32_t idA = prev_x_idx_00;
+                uint32_t idB = cur_idx_00;
+                uint32_t idC = cur_idx_10;
+                uint32_t idD = prev_x_idx_10;
+                bool positive = (MeshEdgeUtils::transversal_combination(case_z_far,case_x, true) == 1);
+                uint32_t write_idx = (z_offset + z_far_edge_counter) * 6;
 
-            //     // Keep the previous Y-edge winding convention.
-            //     write_quad(write_idx, positive, idA, idB, idC, idD);
-            //     z_far_edge_counter--;
-            //     }
-            // }
+                // Keep the previous Y-edge winding convention.
+                write_quad(write_idx, positive, idA, idB, idC, idD);
+                z_far_edge_counter--;
+                }
+            }
         }
 
         // Push current points indices to previous for next iteration step

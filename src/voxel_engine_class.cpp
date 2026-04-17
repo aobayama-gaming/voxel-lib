@@ -101,7 +101,7 @@ void VoxelEngineClass::_ready() {
         //     value *= phi;
         // }
         // Configuration
-        const int lod_levels = 2;
+        const int lod_levels = 5;
 
         // LOD thresholds are stored in chunk-coordinate units because the scan
         // logic compares them against chunk-space distances.
@@ -412,9 +412,9 @@ void VoxelEngineClass::chunk_patching(ChunkClass &chunk){
             chunk_id.z+z_offset*2*chunk_size
         );
 
-        if(neighbor_coordinate==Vector3i(-3,-3,3) && chunk_id == Vector3i(-1, -1, 5)){
-            print_line("test");
-        }
+        // if(neighbor_coordinate==Vector3i(-3,-3,3) && chunk_id == Vector3i(-1, -1, 5)){
+        //     print_line("test");
+        // }
 
         const int neighbor_lod = chunks.get_chunk(neighbor_coordinate,neighbors[i_offset]);
 
@@ -423,9 +423,9 @@ void VoxelEngineClass::chunk_patching(ChunkClass &chunk){
             continue;
         }
         // erase pointer if same size
-        if(neighbor_lod == chunk_lod){
-            neighbors[i_offset] = nullptr;
-        }
+        // if(neighbor_lod == chunk_lod){
+        //     neighbors[i_offset] = nullptr;
+        // }
 
         max_lod = MAX(neighbor_lod,max_lod);
 
@@ -446,6 +446,8 @@ void VoxelEngineClass::chunk_patching(ChunkClass &chunk){
 
         const Vector3 world_edge = ChunkMath::vertices_to_world(chunk_id,edge_position);
 
+        const Vector3 mid_edge = edge_position.floor()+Vector3(0.5f,0.5f,0.5f);
+
         int32_t local_max_lod = -1;
 
         float distance = -1.0f;
@@ -462,36 +464,23 @@ void VoxelEngineClass::chunk_patching(ChunkClass &chunk){
 
             const int neighbor_lod = ChunkMath::get_lod(neighbor_chunk_id);
 
+
+            const Vector3 local_position = ChunkMath::world_to_vertices(neighbor_chunk_id,ChunkMath::vertices_to_world(chunk_id,edge_position));
+
+            if(ChunkMath::vertices_out_of_bound(local_position.floor())){
+                continue;
+            }
+
+            if(!neighbor_vertices_data.edge_cache.has(local_position.floor())){
+                continue;
+            }
+
             if(neighbor_lod<local_max_lod){
                 continue;
             }
 
-            const Vector3 local_position = ChunkMath::world_to_vertices(neighbor_chunk_id,ChunkMath::vertices_to_world(chunk_id,edge_position));
-
-            float local_distance = -1;
-            Vector3 local_edge_displacement = Vector3();
-
-            for(int j=0;j<27;j++){
-
-            const int x_offset = j%3 -1;
-            const int y_offset = (j/3)%3 -1;
-            const int z_offset = (j/9)%3 -1;
-
-            const Vector3 local_translated = Vector3(
-                local_position.x+x_offset,
-                local_position.y+y_offset,
-                local_position.z+z_offset
-            );
-
-            if(ChunkMath::vertices_out_of_bound(local_translated)){
-                continue;
-            }
-
-            if(!neighbor_vertices_data.edge_cache.has(local_translated.floor())){
-                continue;
-            }
-
-            const int neighbor_edge_index = neighbor_vertices_data.edge_cache.get(local_translated.floor());
+            //easy
+            const int neighbor_edge_index = neighbor_vertices_data.edge_cache.get(local_position.floor());
 
             Vector3 edge_displacement_temp = neighbor_vertices_data.points[neighbor_edge_index];
 
@@ -503,18 +492,61 @@ void VoxelEngineClass::chunk_patching(ChunkClass &chunk){
 
             const float new_distance = edge_displacement_temp.length();
 
-            if(local_distance == -1 || new_distance<local_distance){
-                local_distance = new_distance;
-                local_edge_displacement = edge_displacement_temp;
+            if(distance == -1 || new_distance<distance){
+                distance = new_distance;
+                edge_displacement = edge_displacement_temp;
                 local_max_lod = neighbor_lod;
             }
 
-            }
+            //complex
 
-            if(local_distance>-1 && (distance==-1||local_distance<distance)){
-                distance =local_distance;
-                edge_displacement = local_edge_displacement;
-            }
+            // float local_distance = -1;
+            // Vector3 local_edge_displacement = Vector3();
+
+            // for(int j=0;j<27;j++){
+
+            // const int x_offset = j%3 -1;
+            // const int y_offset = (j/3)%3 -1;
+            // const int z_offset = (j/9)%3 -1;
+
+            // const Vector3 local_translated = Vector3(
+            //     local_position.x+x_offset,
+            //     local_position.y+y_offset,
+            //     local_position.z+z_offset
+            // );
+
+            // if(ChunkMath::vertices_out_of_bound(local_translated)){
+            //     continue;
+            // }
+
+            // if(!neighbor_vertices_data.edge_cache.has(local_translated.floor())){
+            //     continue;
+            // }
+
+            // const int neighbor_edge_index = neighbor_vertices_data.edge_cache.get(local_translated.floor());
+
+            // Vector3 edge_displacement_temp = neighbor_vertices_data.points[neighbor_edge_index];
+
+            // edge_displacement_temp = ChunkMath::vertices_to_world(neighbor_chunk_id,edge_displacement_temp);
+
+            // edge_displacement_temp = ChunkMath::world_to_vertices(chunk_id,edge_displacement_temp);
+
+            // edge_displacement_temp = edge_displacement_temp - edge_position;
+
+            // const float new_distance = edge_displacement_temp.length();
+
+            // if(local_distance == -1 || new_distance<local_distance){
+            //     local_distance = new_distance;
+            //     local_edge_displacement = edge_displacement_temp;
+            //     local_max_lod = neighbor_lod;
+            // }
+
+            // }
+
+            // if(local_distance>-1 && (distance==-1||local_distance<distance)){
+            //     distance =local_distance;
+            //     edge_displacement = local_edge_displacement;
+            // }
 
         }
 

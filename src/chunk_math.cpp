@@ -128,7 +128,7 @@ float _direct_transform(float inputValue,float chunk_dim){
 
     const float CHUNK_SIZE = static_cast<float>(VoxelEngineConstants::CHUNK_SIZE-1.0f);
 
-    return  (inputValue-0.5f)*chunk_dim/CHUNK_SIZE;
+    return  (inputValue)*chunk_dim/CHUNK_SIZE;
 
 }
 
@@ -136,7 +136,7 @@ float _inverse_transform(float inputValue,float chunk_dim){
 
     const float CHUNK_SIZE = static_cast<float>(VoxelEngineConstants::CHUNK_SIZE-1.0f);
 
-    return inputValue*CHUNK_SIZE/chunk_dim+0.5f;
+    return inputValue*CHUNK_SIZE/chunk_dim;
 
 }
 
