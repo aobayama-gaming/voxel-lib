@@ -106,8 +106,8 @@ void ChunkClass::_build_chunk_mesh() {
     }
 
     const auto &points = mesh_info.vertices_data.points;
-    const auto &raw_indices = mesh_info.vertices_data.vertices;
-    const auto &edge_displacement = mesh_info.vertices_data.edge_displacement;
+    const auto &raw_indices = mesh_info.vertices_data.output_vertices;
+
 
     if (points.empty() || raw_indices.empty()) {
         mesh_instance->set_mesh(Ref<ArrayMesh>());
@@ -124,10 +124,6 @@ void ChunkClass::_build_chunk_mesh() {
 
     for (size_t i = 0; i < points.size(); ++i) {
         Vector3 local_position = points[i];
-
-        if (edge_displacement.has(i)) {
-            local_position += edge_displacement.get(i);
-        }
 
         const Vector3 world_pos = ChunkMath::vertices_to_world(chunk_pos, local_position);
         shared_positions.set(static_cast<int>(i), world_pos - chunk_origin);
