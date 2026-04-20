@@ -88,18 +88,9 @@ void VoxelEngineClass::_ready() {
     //if (lod_distances.is_empty()) {
     if (true) {
         //hard coded base distances for LOD levels. Can be modified later to be more dynamic or to be set in the editor.
-        // const float phi = 2.0f;
-        // const float alpha = 2.0f;
-        // const int lod_levels = 15;
 
         PackedFloat32Array generated_distances;
-        // generated_distances.resize(lod_levels+1);
 
-        // float value = alpha;
-        // for (int i = 0; i < lod_levels+1; ++i) {
-        //     generated_distances.set(i, value);
-        //     value *= phi;
-        // }
         // Configuration
         const int lod_levels = 4;
 

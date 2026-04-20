@@ -58,23 +58,6 @@ struct VerticesData {
             return (*this)(coord.x, coord.y, coord.z);
         }
 
-
-        // I don't really like this lol.
-        // std::vector<bool>::reference at(int32_t x, int32_t y, int32_t z) {
-        //     return (*this)(x, y, z);
-        // }
-
-        // std::vector<bool>::reference at(const Vector3i &coord) {
-        //     return (*this)(coord);
-        // }
-
-        // bool at(int32_t x, int32_t y, int32_t z) const {
-        //     return (*this)(x, y, z);
-        // }
-
-        // bool at(const Vector3i &coord) const {
-        //     return (*this)(coord);
-        // }
     };
 
     // Metadata grid of size (chunk_size +1)^2
@@ -107,7 +90,9 @@ struct VerticesData {
         int32_t height = 0;
         int32_t depth = 0;
         std::vector<Metadata> values;
+        std::vector<Metadata> inner_values;
         std::vector<Metadata::Counts> cumulative_counts;
+        std::vector<Metadata::Counts> inner_cumulative_counts;
         bool cache_valid = false;
 
         void resize(int32_t p_height, int32_t p_depth) {
@@ -136,6 +121,7 @@ struct VerticesData {
 
         void cache() {
             cumulative_counts.resize(values.size());
+            inner_cumulative_counts.resize(inner_values.size());
 
             if (depth <= 0 || height <= 0 || values.empty()) {
                 cache_valid = true;
@@ -143,6 +129,7 @@ struct VerticesData {
             }
 
             Metadata::Counts row_accumulator {};
+            Metadata::Counts inner_row_accumulator {};
             
             for (int32_t z = 0; z < depth; ++z) {
                 
@@ -157,7 +144,16 @@ struct VerticesData {
                     row_accumulator.point += source.counts.point;
 
                     cumulative_counts[i] = row_accumulator; // Stored after in order to have the total number directly, (we have last index of each y,z +1)
+                    
+                    const Metadata &inner_source = inner_values[i];
 
+                    inner_row_accumulator.x_edge += inner_source.counts.x_edge;
+                    inner_row_accumulator.y_edge += inner_source.counts.y_edge;
+                    inner_row_accumulator.z_edge += inner_source.counts.z_edge;
+                    inner_row_accumulator.point += inner_source.counts.point;
+
+                    inner_cumulative_counts[i] = inner_row_accumulator; // Stored after in order to have the total number directly, (we have last index of each y,z +1)
+                    
 
                 }
             }
@@ -186,9 +182,10 @@ struct VerticesData {
     HashMap<Vector3i,int32_t> edge_cache;
 
     std::vector<Vector3> points;
-    std::vector<uint32_t> vertices;
 
-    HashMap<int32_t,Vector3> edge_displacement;
+    PackedVector3Array output_points;
+    PackedVector3Array output_normals;
+    PackedInt32Array output_vertices;
 
 
     void configure(int32_t p_width, int32_t p_height, int32_t p_depth) { // The size of this should one unit bigger (difference between center and corner)
@@ -210,18 +207,12 @@ struct VerticesData {
         y_edge.configure(max_meta.y_edge);
         z_edge.configure(max_meta.z_edge);
 
-        // over-allocate (because on edge we don t create the quad, actually don't care ? )
+        // DEPRECATED : over-allocate (because on edge we don t create the quad, actually don't care ? ) 
 
-        vertices.resize(static_cast<size_t>((max_meta.x_edge+max_meta.y_edge+max_meta.z_edge)*6));
+        output_vertices.resize(static_cast<size_t>((max_meta.x_edge+max_meta.y_edge+max_meta.z_edge)*6));
 
 
     }
-
-
-    void configure_vertices(int32_t p_count) {
-        vertices.resize(static_cast<size_t>(p_count));
-    }
-
     
 };
 
@@ -279,6 +270,7 @@ private:
 
     void _accumulate_qef(Vector3 normal,Vector3 position,Basis& a_matrix,Vector3& b_vector);
     Vector3 _surface_net_vertex(const Vector3 &mass_point_sum, int32_t num_vertices) const;
+    bool _vertices_inside(int x,int y,int z);
 
 public:
 

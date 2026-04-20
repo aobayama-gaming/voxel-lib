@@ -138,6 +138,10 @@ bool solve_linear_system_3x3(const Basis &a, const Vector3 &b, Vector3 &x) {
 
 }
 
+bool MeshBufferClass::_vertices_inside(int x,int y,int z){
+    return x==0 || x==vertices_data.depth-1 || y==0 ||y==vertices_data.height-1
+}
+
 void MeshBufferClass::initialize(const Vector3i &p_chunk_id, SDFBase *p_sdf) {
 
     sdf = p_sdf;
@@ -592,13 +596,6 @@ void MeshBufferClass::_accumulate_qef(Vector3 normal, Vector3 position, Basis& a
     b_total += b_plane;
 }
 
-Vector3 MeshBufferClass::_surface_net_vertex(const Vector3 &mass_point_sum, int32_t num_vertices) const {
-    if (num_vertices <= 0) {
-        return Vector3();
-    }
-    return mass_point_sum / static_cast<float>(num_vertices);
-}
-
 void MeshBufferClass::fourth_pass(const int32_t p_y_cell,const int32_t p_z_cell,const float_t alpha=0.01f){
 
     if( p_y_cell>=vertices_data.height-1 || p_z_cell>=vertices_data.depth-1 ){
@@ -837,7 +834,7 @@ void MeshBufferClass::fifth_pass(const int32_t p_y_qcell, const int32_t p_z_qcel
     const uint32_t y_offset = max_meta.x_edge;
     const uint32_t z_offset = max_meta.x_edge + max_meta.y_edge;
 
-    auto& vertices = vertices_data.vertices;
+    auto& vertices = vertices_data.output_vertices;
 
     auto write_quad = [&](uint32_t write_idx, bool positive, uint32_t idA, uint32_t idB, uint32_t idC, uint32_t idD) {
         if (positive) {
@@ -993,8 +990,6 @@ void MeshBufferClass::cache_edge() {
     if (vertices_data.points.empty()) {
         return;
     }
-
-
 
     const int32_t x_max = vertices_data.width - 1;
     const int32_t y_max = vertices_data.height - 2;

@@ -5,7 +5,7 @@
 [node name="Node" type="Node" unique_id=964298627]
 
 [node name="VoxelEngineClass" type="VoxelEngineClass" parent="." unique_id=31545966]
-lod_distances = PackedFloat32Array(1, 1.6755756, 3.3511512, 6.7023025, 13.404605)
+lod_distances = PackedFloat32Array(2.0944695, 4.188939, 8.377878, 16.755756, 33.511513)
 script = ExtResource("1_2jas5")
 
 [node name="Marker3D" type="Marker3D" parent="." unique_id=2116868861]
@@ -19,3 +19,9 @@ light_volumetric_fog_energy = 0.0
 light_angular_distance = 3.93
 light_specular = 0.0
 shadow_enabled = true
+
+[node name="SpotLight3D" type="SpotLight3D" parent="." unique_id=267591519]
+transform = Transform3D(0.0025574323, 0.70288587, -0.7112979, -0.0025271692, 0.7113025, 0.70288134, 0.9999935, -1.1350517e-09, 0.00359542, -2.4165802, 0.7151184, -0.81583714)
+light_bake_mode = 1
+spot_range = 4.7729235
+spot_angle = 42.880646
